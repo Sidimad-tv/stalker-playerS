@@ -938,6 +938,45 @@ const server = http.createServer(function(req, res) {
     return;
   }
 
+  // Stream API endpoint (for Stb.html compatibility)
+  if (pathname === '/api/stalker/stream') {
+    if (req.method === 'POST') {
+      readJsonBody(req).then(function(body) {
+        var url = body.url || body.streamUrl;
+        var token = body.token;
+        var portal = body.portal;
+        var mac = body.mac;
+        var cmd = body.cmd;
+        var transcode = body.transcode;
+        if (!url) {
+          return sendJson(res, 400, { error: 'Missing url parameter' });
+        }
+        // Convert HTTP to HTTPS to avoid mixed content
+        if (url.startsWith('http://')) {
+          url = url.replace('http://', 'https://');
+        }
+        proxyStream(res, url, 'GET', token, portal, mac, cmd, transcode);
+      }).catch(function(err) {
+        sendJson(res, 400, { error: 'Invalid JSON: ' + err.message });
+      });
+    } else if (req.method === 'GET' && u.searchParams.has('url')) {
+      var url = u.searchParams.get('url');
+      var token = u.searchParams.get('token') || '';
+      var portal = u.searchParams.get('portal') || '';
+      var mac = u.searchParams.get('mac') || '';
+      var cmd = u.searchParams.get('cmd') || '';
+      var transcode = u.searchParams.get('transcode') === 'true';
+      // Convert HTTP to HTTPS to avoid mixed content
+      if (url.startsWith('http://')) {
+        url = url.replace('http://', 'https://');
+      }
+      proxyStream(res, url, 'GET', token, portal, mac, cmd, transcode);
+    } else {
+      sendJson(res, 400, { error: 'Missing url parameter' });
+    }
+    return;
+  }
+
   // Stalker API
   if (pathname.indexOf('/api/stalker/') === 0) {
     return handleStalkerApi(req, res, u);
