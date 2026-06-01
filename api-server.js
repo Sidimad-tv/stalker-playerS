@@ -4,16 +4,24 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const spawn = require('child_process').spawn;
+const ffmpeg = require('fluent-ffmpeg');
 
 var ffmpegPath = null;
-try { ffmpegPath = require('ffmpeg-static'); } catch(e) {}
-// Replit-specific FFmpeg detection
+try {
+  const ffmpegInstaller = require('@ffmpeg-installer/ffmpeg');
+  ffmpegPath = ffmpegInstaller.path;
+} catch(e) {
+  console.log('[ffmpeg] @ffmpeg-installer not available, trying system paths');
+}
+
+// System FFmpeg detection
 if (!ffmpegPath) {
   try {
     const { execSync } = require('child_process');
     ffmpegPath = execSync('which ffmpeg').toString().trim();
   } catch(e) {}
 }
+
 // Additional fallback paths
 if (!ffmpegPath) {
   const possiblePaths = [
@@ -31,7 +39,14 @@ if (!ffmpegPath) {
     } catch(e) {}
   }
 }
-if (ffmpegPath) console.log('[ffmpeg] path=%s', ffmpegPath); else console.log('[ffmpeg] NOT AVAILABLE');
+
+// Set FFmpeg path if found
+if (ffmpegPath) {
+  ffmpeg.setFfmpegPath(ffmpegPath);
+  console.log('[ffmpeg] path=%s', ffmpegPath);
+} else {
+  console.log('[ffmpeg] NOT AVAILABLE - transcoding will be disabled');
+}
 
 process.on('uncaughtException', function(e) { console.error('Uncaught:', e.message); });
 process.on('unhandledRejection', function(e) { console.error('Unhandled:', e.message); });

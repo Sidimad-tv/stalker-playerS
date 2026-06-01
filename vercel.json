@@ -1,46 +1,26 @@
 {
   "version": 2,
-  "builds": [
-    {
-      "src": "api/**/*.js",
-      "use": "@vercel/node"
+  "functions": {
+    "api/**/*.js": {
+      "maxDuration": 60
     }
-  ],
-  "routes": [
+  },
+  "rewrites": [
     {
-      "src": "/api/(.*)",
-      "dest": "/api/server.js"
+      "source": "/api/:path*",
+      "destination": "/api/server.js"
     },
     {
-      "src": "/proxy/(.*)",
-      "dest": "/api/server.js"
+      "source": "/proxy/:path*",
+      "destination": "/api/server.js"
     },
     {
-      "src": "/fetch",
-      "dest": "/api/server.js"
+      "source": "/fetch",
+      "destination": "/api/server.js"
     },
     {
-      "src": "/stalker.html",
-      "dest": "/stalker.html"
-    },
-    {
-      "src": "/index.html",
-      "dest": "/index.html"
-    },
-    {
-      "src": "/js/(.*)",
-      "dest": "/js/$1"
-    },
-    {
-      "src": "/css/(.*)",
-      "dest": "/css/$1"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/$1"
+      "source": "/(.*)",
+      "destination": "/$1"
     }
-  ],
-  "env": {
-    "NODE_ENV": "production"
-  }
+  ]
 }
