@@ -6,7 +6,30 @@ const crypto = require('crypto');
 const spawn = require('child_process').spawn;
 var ffmpegPath = null;
 try { ffmpegPath = require('ffmpeg-static'); } catch(e) {}
-if (!ffmpegPath) try { ffmpegPath = require('which').sync('ffmpeg'); } catch(e) {}
+// Replit-specific FFmpeg detection
+if (!ffmpegPath) {
+  try {
+    const { execSync } = require('child_process');
+    ffmpegPath = execSync('which ffmpeg').toString().trim();
+  } catch(e) {}
+}
+// Additional fallback paths
+if (!ffmpegPath) {
+  const possiblePaths = [
+    '/usr/bin/ffmpeg',
+    '/usr/local/bin/ffmpeg',
+    '/opt/ffmpeg/bin/ffmpeg',
+    'ffmpeg'
+  ];
+  for (const p of possiblePaths) {
+    try {
+      const { execSync } = require('child_process');
+      execSync(`test -x ${p}`, { stdio: 'ignore' });
+      ffmpegPath = p;
+      break;
+    } catch(e) {}
+  }
+}
 if (ffmpegPath) console.log('[ffmpeg] path=%s', ffmpegPath); else console.log('[ffmpeg] NOT AVAILABLE');
 
 const PORT = 3000;
