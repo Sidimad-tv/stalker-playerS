@@ -393,7 +393,7 @@ module.exports = async function(req, res) {
 
   if (reqPath === '/api/status') return sendJson(res, 200, { ok: true, ffmpeg: !!getFfmpeg(), node: process.version });
 
-  if (reqPath === '/proxy/stream' && (method === 'GET' || method === 'HEAD')) {
+  if (reqPath === '/proxy/stream' && method === 'GET') {
     var proxyQ = require('url').parse(req.url, true).query;
     if (!proxyQ.url) return sendJson(res, 400, { error: 'Missing url' });
     proxyStream(res, proxyQ.url, 'GET', proxyQ.token || '', proxyQ.portal || '', proxyQ.mac || '', proxyQ.cmd || '', proxyQ.transcode === 'true' || proxyQ.transcode === '1');
@@ -407,10 +407,10 @@ module.exports = async function(req, res) {
     return;
   }
 
-  if (reqPath === '/api/stalker/stream-get' && (method === 'GET' || method === 'HEAD')) {
+  if (reqPath === '/api/stalker/stream-get' && method === 'GET') {
     var sg = require('url').parse(req.url, true).query;
     if (!sg.url) return sendJson(res, 400, { error: 'Missing url' });
-    proxyStream(res, sg.url, method, sg.token || '', sg.portal || '', sg.mac || '', sg.cmd || '', sg.transcode === 'true' || sg.transcode === '1');
+    proxyStream(res, sg.url, 'GET', sg.token || '', sg.portal || '', sg.mac || '', sg.cmd || '', sg.transcode === 'true' || sg.transcode === '1');
     return;
   }
 
