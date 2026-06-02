@@ -407,9 +407,10 @@ module.exports = async function(req, res) {
     return;
   }
 
-  if (reqPath === '/api/stalker/stream-get' && method === 'GET') {
+  if (reqPath === '/api/stalker/stream-get' && (method === 'GET' || method === 'HEAD')) {
     var sg = require('url').parse(req.url, true).query;
     if (!sg.url) return sendJson(res, 400, { error: 'Missing url' });
+    if (method === 'HEAD') { res.writeHead(200, { 'Content-Type': 'video/mp2t', 'Access-Control-Allow-Origin': '*' }); return res.end(); }
     proxyStream(res, sg.url, 'GET', sg.token || '', sg.portal || '', sg.mac || '', sg.cmd || '', sg.transcode === 'true' || sg.transcode === '1');
     return;
   }
