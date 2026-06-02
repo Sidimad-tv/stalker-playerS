@@ -498,6 +498,29 @@ button:focus {
     background: #000;
 }
 
+.preview-fs-btn {
+    position: absolute;
+    bottom: 10px;
+    right: 10px;
+    z-index: 10;
+    background: rgba(0,0,0,0.6);
+    color: #fff;
+    border: 1px solid rgba(255,255,255,0.3);
+    border-radius: 4px;
+    padding: 6px 12px;
+    font-size: 20px;
+    cursor: pointer;
+    opacity: 0.8;
+    transition: opacity 0.2s;
+}
+.preview-fs-btn:hover {
+    opacity: 1;
+    background: rgba(0,0,0,0.8);
+}
+.video-preview-container {
+    position: relative;
+}
+
 /* TV-Style Info Banner */
 .info-banner {
     position: absolute;

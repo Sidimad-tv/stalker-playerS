@@ -44,7 +44,8 @@ document.addEventListener('DOMContentLoaded', () => {
         tvViewContainer: document.getElementById('tv-view-container'),
         movieViewContainer: document.getElementById('movie-view-container'),
         movieGrid: document.getElementById('movie-grid'),
-        movieSearch: document.getElementById('movie-search')
+        movieSearch: document.getElementById('movie-search'),
+        previewFsBtn: document.getElementById('preview-fs-btn')
     };
 
     // Default MAC (mock for browser)
@@ -119,6 +120,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Remote Control Key Handling
     document.addEventListener('keydown', handleKeyInput);
+
+    // Fullscreen button from preview
+    ui.previewFsBtn.addEventListener('click', function() {
+        if (selectedChannel) {
+            goFullscreen(selectedChannel.url);
+        }
+    });
 
     async function handleConnect() {
         const url = ui.portalInput.value;
@@ -466,6 +474,9 @@ document.addEventListener('DOMContentLoaded', () => {
             previewMpegts = null;
         }
 
+        // Show fullscreen button
+        ui.previewFsBtn.classList.remove('hidden');
+
         try {
             const cleanUrl = await stalkerClient.createLink(url);
             // Use proxy for preview
@@ -517,6 +528,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function goFullscreen(url) {
+        ui.previewFsBtn.classList.add('hidden');
         // Stop preview
         if (previewHls) {
             previewHls.destroy();
@@ -601,6 +613,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Detect Format
         if (isMpegTs(url) && typeof mpegts !== 'undefined' && mpegts.isSupported()) {
             console.log("Using mpegts.js for fullscreen");
+            var mpegtsFallback = false;
             mpegtsPlayer = mpegts.createPlayer({
                 type: 'mpegts',
                 isLive: true,
@@ -611,12 +624,22 @@ document.addEventListener('DOMContentLoaded', () => {
             mpegtsPlayer.play().catch(function (e) {
                 console.error('mpegts playback failed:', e);
                 showStatus("Playback failed: " + e.message, "error");
+                mpegtsFallback = true;
             });
 
-            mpegtsPlayer.on(mpegts.Events.ERROR, (errorType, errorDetail, errorInfo) => {
+            mpegtsPlayer.on(mpegts.Events.ERROR, function(errorType, errorDetail, errorInfo) {
                 console.log("mpegts error:", errorType, errorDetail, errorInfo);
+                if (mpegtsFallback) return;
                 if (errorType === mpegts.ErrorTypes.NETWORK_ERROR) {
-                    showStatus("Network Error (mpegts)", "error");
+                    console.log("mpegts network error, trying native video fallback");
+                    showStatus("Stream unstable, switching to VLC link...", "info");
+                    mpegtsFallback = true;
+                    if (mpegtsPlayer) { mpegtsPlayer.destroy(); mpegtsPlayer = null; }
+                    video.src = proxiedUrl;
+                    video.play().catch(function(e) {
+                        console.error('Native fallback also failed:', e);
+                        showStatus("Stream URL: " + url + " (Copy to VLC)", "info");
+                    });
                 }
             });
 
