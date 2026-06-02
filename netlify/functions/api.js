@@ -356,35 +356,59 @@ function streamHandler(event, context, callback) {
     if (action === 'convert') {
       var types = body.types || ['live'];
       var maxPages = parseInt(body.maxPages, 10) || 50;
+      var output = '';
       return resolvePortalBase(portal, mac).then(function(base) {
         return stbHandshake(base, mac).then(function(token) {
           return stbProfile(base, mac, token).catch(function() { return {}; }).then(function(profile) {
-            return stbFetchGenres(base, mac, token, types[0] || 'live').then(function(genres) {
-              var results = [];
-              var totalSent = 0;
-              var seen = {};
-              return stbFetchPage(base, mac, token, types[0], 1).then(function(page1) {
-                var items = page1.items || [];
-                for (var i = 0; i < items.length; i++) {
-                  var ch = items[i];
-                  var cid = String(ch.id || ch.cmd || '');
-                  if (seen[cid]) continue;
-                  seen[cid] = true;
-                  var rawCmd = ch.cmd || '';
-                  var stream = ensureAbsoluteUrl(rewriteLocalhost(cleanCmd(rawCmd), base), base);
-                  var genreId = String(ch.tv_genre_id || ch.category_id || '');
-                  totalSent++;
-                  results.push({ event: 'channel', count: totalSent, channel: { name: (ch.name || ch.title || 'Unknown').trim(), logo: ch.logo || ch.screenshot_uri || '', group: genres[genreId] || 'Uncategorized', number: ch.number || ch.ch_number || totalSent, cmd: rawCmd, stream_url: stream, epg_id: ch.xmltv_id || ch.tvg_id || '', media_type: types[0] } });
-                }
-                var output = '';
-                output += JSON.stringify({ event: 'meta', portal: portal, types: types, maxPages: maxPages }) + '\n';
-                output += JSON.stringify({ event: 'profile', profile: profile }) + '\n';
-                results.forEach(function(r) { output += JSON.stringify(r) + '\n'; });
-                output += JSON.stringify({ event: 'progress', scope: types[0], page: 1, count: totalSent, typeCount: totalSent, done: true }) + '\n';
-                output += JSON.stringify({ event: 'done', total: totalSent, errors: [] }) + '\n';
+            output += JSON.stringify({ event: 'meta', portal: portal, types: types, maxPages: maxPages }) + '\n';
+            output += JSON.stringify({ event: 'profile', profile: profile }) + '\n';
+            var totalSent = 0, errors = [];
+            function processTypes(idx) {
+              if (idx >= types.length) {
+                output += JSON.stringify({ event: 'done', total: totalSent, errors: errors }) + '\n';
                 return { statusCode: 200, headers: { 'Content-Type': 'application/x-ndjson; charset=utf-8', 'Access-Control-Allow-Origin': '*' }, body: output };
+              }
+              var mediaType = types[idx];
+              return stbFetchGenres(base, mac, token, mediaType).then(function(genres) {
+                var seen = {}, typeSent = 0;
+                function processPage(pg) {
+                  if (pg > maxPages) {
+                    output += JSON.stringify({ event: 'progress', scope: mediaType, count: totalSent, typeCount: typeSent, done: true }) + '\n';
+                    return processTypes(idx + 1);
+                  }
+                  return stbFetchPage(base, mac, token, mediaType, pg).then(function(result) {
+                    if (!result.items || result.items.length === 0) {
+                      output += JSON.stringify({ event: 'progress', scope: mediaType, count: totalSent, typeCount: typeSent, done: true }) + '\n';
+                      return processTypes(idx + 1);
+                    }
+                    for (var i = 0; i < result.items.length; i++) {
+                      var ch = result.items[i];
+                      var cid = String(ch.id || ch.cmd || '');
+                      if (seen[cid]) continue;
+                      seen[cid] = true;
+                      var rawCmd = ch.cmd || '';
+                      var stream = ensureAbsoluteUrl(rewriteLocalhost(cleanCmd(rawCmd), base), base);
+                      var genreId = String(ch.tv_genre_id || ch.category_id || '');
+                      totalSent++; typeSent++;
+                      output += JSON.stringify({ event: 'channel', count: totalSent, channel: { name: (ch.name || ch.title || 'Unknown').trim(), logo: ch.logo || ch.screenshot_uri || '', group: genres[genreId] || 'Uncategorized', number: ch.number || ch.ch_number || totalSent, cmd: rawCmd, stream_url: stream, epg_id: ch.xmltv_id || ch.tvg_id || '', media_type: mediaType } }) + '\n';
+                    }
+                    output += JSON.stringify({ event: 'progress', scope: mediaType, page: pg, count: totalSent, typeCount: typeSent, done: (result.total && typeSent >= result.total) || (result.items.length === 0) }) + '\n';
+                    if (result.total && typeSent >= result.total) {
+                      output += JSON.stringify({ event: 'progress', scope: mediaType, count: totalSent, typeCount: typeSent, done: true }) + '\n';
+                      return processTypes(idx + 1);
+                    }
+                    return processPage(pg + 1);
+                  }).catch(function(e) {
+                    errors.push(mediaType + ' p' + pg + ': ' + e.message);
+                    output += JSON.stringify({ event: 'error', scope: mediaType, message: e.message, page: pg }) + '\n';
+                    output += JSON.stringify({ event: 'progress', scope: mediaType, count: totalSent, typeCount: typeSent, done: true }) + '\n';
+                    return processTypes(idx + 1);
+                  });
+                }
+                return processPage(1);
               });
-            });
+            }
+            return processTypes(0);
           });
         });
       }).catch(function(e) { return jsonResponse(502, { ok: false, error: e.message }); });
