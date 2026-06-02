@@ -1,5 +1,3 @@
-const serverless = require('serverless-http');
-const app = require('../../api-server');
+const app = require('../../app');
 
-// Export for Netlify Functions
-module.exports.handler = serverless(app);
+module.exports.handler = app.handler;

@@ -4,7 +4,7 @@
 
 [functions]
   node_bundler = "esbuild"
-  included_files = ["node_modules/@ffmpeg-installer/ffmpeg/**"]
+  included_files = ["node_modules/ffmpeg-static/**"]
   timeout = 60
 
 [[redirects]]
