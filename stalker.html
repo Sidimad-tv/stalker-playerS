@@ -244,11 +244,10 @@ function getBestPlayer(url, contentType) {
     var isHls = u.indexOf('.m3u8') !== -1 || u.indexOf('extension=m3u8') !== -1 || (contentType && (contentType.indexOf('mpegurl') !== -1 || contentType.indexOf('apple') !== -1));
     var isMpegTs = u.indexOf('.ts') !== -1 || u.indexOf('extension=ts') !== -1 || u.indexOf('/live/play/') !== -1 || (contentType && contentType.indexOf('mp2t') !== -1);
     var isDash = u.indexOf('.mpd') !== -1 || (contentType && contentType.indexOf('dash') !== -1);
-    if (isMpegTs && players.mpegts) return 'mpegts';
+    if (isMpegTs) return (players.mpegts ? 'mpegts' : 'native');
     if (players.shaka && (isHls || isDash)) return 'shaka';
     if (isHls && players.hls) return 'hls';
     if (players.mpegts) return 'mpegts';
-    if (players.shaka) return 'shaka';
     return 'native';
 }
 
