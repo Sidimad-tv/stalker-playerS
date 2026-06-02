@@ -90,7 +90,7 @@ input,button{font:inherit}
 
 <script>
 var $=function(id){return document.getElementById(id)};
-var portal=$('portal'),mac=$('mac'),connect=$('connect'),status=$('status');
+var portal=$('portal'),mac=$('mac'),connect=$('connect'),stEl=$('status');
 var main=$('main'),title=$('title'),cats=$('cats'),list=$('list'),search=$('search');
 var player=$('player'),vid=$('vid'),load=$('load'),back=$('back'),info=$('info');
 var err=$('err'),errMsg=$('err-msg'),vlc=$('vlc');
@@ -98,7 +98,7 @@ var err=$('err'),errMsg=$('err-msg'),vlc=$('vlc');
 var client=null,allItems=[],catMap={},catList=[],currentCat='all',currentMode='tv',selCh=null,mpegtsPlayer=null,favs=[];
 
 function esc(s){return String(s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
-function setSt(s,e){status.textContent=s;status.style.color=e?'#f55':'#00d4a0'}
+function setSt(s,e){stEl.textContent=s;stEl.style.color=e?'#f55':'#00d4a0'}
 function getF(){try{return JSON.parse(localStorage.getItem('st_fav')||'[]')}catch(e){return[]}}
 function setF(a){localStorage.setItem('st_fav',JSON.stringify(a))}
 function idF(u){return getF().indexOf(u)!==-1}
