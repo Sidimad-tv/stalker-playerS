@@ -12,10 +12,6 @@ function detectFfmpeg() {
     var r = require('child_process').execSync('which ffmpeg').toString().trim();
     if (r) { ffmpegPath = r; return r; }
   } catch(e) {}
-  try {
-    var p = require('ffmpeg-static');
-    if (p) { ffmpegPath = p; return p; }
-  } catch(e) {}
   ffmpegPath = false; return null;
 }
 
