@@ -7,7 +7,11 @@ var ffmpegPath = null;
 function getFfmpeg() {
   if (ffmpegPath !== null) return ffmpegPath || null;
   try {
-    var r = require('child_process').execSync('which ffmpeg').toString().trim();
+    var staticPath = require('ffmpeg-static');
+    if (staticPath) { ffmpegPath = staticPath; return staticPath; }
+  } catch(e) {}
+  try {
+    var r = require('child_process').execSync('which ffmpeg 2>/dev/null || where ffmpeg 2>nul').toString().trim();
     if (r) { ffmpegPath = r; return r; }
   } catch(e) {}
   ffmpegPath = false;
@@ -306,11 +310,19 @@ function streamHandler(event, context, callback) {
 
   if (path === '/api/status') return Promise.resolve(jsonResponse(200, { ok: true, ffmpeg: !!getFfmpeg(), node: process.version }));
 
+  if (path === '/proxy/stream' && method === 'GET') {
+    var proxyQ = event.queryStringParameters || {};
+    if (!proxyQ.url) return Promise.resolve(jsonResponse(400, { error: 'Missing url' }));
+    return proxyStreamPromise(proxyQ.url, 'GET', proxyQ.token || '', proxyQ.portal || '', proxyQ.mac || '', proxyQ.cmd || '', proxyQ.transcode === 'true' || proxyQ.transcode === '1').then(function(r) {
+      return { statusCode: r.statusCode, headers: { 'Content-Type': r.contentType, 'Access-Control-Allow-Origin': '*' }, body: r.body, isBase64Encoded: r.isBase64Encoded || false };
+    });
+  }
+
   if (path === '/fetch' && method === 'GET') {
     var target = (event.queryStringParameters && event.queryStringParameters.url);
     if (!target) return Promise.resolve(jsonResponse(400, { error: 'Missing url' }));
-    return proxyStreamPromise(target, 'GET', null).then(function(r) {
-      return { statusCode: r.statusCode, headers: { 'Content-Type': r.contentType, 'Access-Control-Allow-Origin': '*' }, body: r.body };
+    return proxyStreamPromise(target, 'GET', null, '', '', '', false).then(function(r) {
+      return { statusCode: r.statusCode, headers: { 'Content-Type': r.contentType, 'Access-Control-Allow-Origin': '*' }, body: r.body, isBase64Encoded: r.isBase64Encoded || false };
     });
   }
 
@@ -415,8 +427,8 @@ function streamHandler(event, context, callback) {
       var streamUrl = body.url;
       if (!streamUrl) return Promise.resolve(jsonResponse(400, { error: 'url required' }));
       var mseToken = body.token || '';
-      return proxyStreamPromise(streamUrl, 'GET', mseToken).then(function(r) {
-        return { statusCode: r.statusCode, headers: { 'Content-Type': r.contentType, 'Access-Control-Allow-Origin': '*' }, body: r.body };
+      return proxyStreamPromise(streamUrl, 'GET', mseToken, '', '', '', false).then(function(r) {
+        return { statusCode: r.statusCode, headers: { 'Content-Type': r.contentType, 'Access-Control-Allow-Origin': '*' }, body: r.body, isBase64Encoded: r.isBase64Encoded || false };
       });
     }
 
@@ -426,31 +438,57 @@ function streamHandler(event, context, callback) {
   return Promise.resolve(jsonResponse(404, { error: 'Not found' }));
 }
 
-function proxyStreamPromise(url, method, token) {
-  return new Promise(function(resolve, reject) {
-    if (!method) method = 'GET';
-    var u = new URL(url);
-    var mod = u.protocol === 'https:' ? https : http;
-    var headers = { 'User-Agent': 'Mozilla/5.0 (QtEmbedded; U; Linux; C) AppleWebKit/533.3 (KHTML, like Gecko) MAG200 stbapp ver: 2 rev: 250 Safari/533.3', 'Accept': '*/*' };
-    if (token) headers['Authorization'] = 'Bearer ' + token;
-    var opts = {
-      hostname: u.hostname, port: u.port || (u.protocol === 'https:' ? 443 : 80),
-      path: u.pathname + u.search, method: method, headers: headers,
-      rejectUnauthorized: false, timeout: 30000,
-    };
-    var req = mod.request(opts, function(proxyRes) {
-      var chunks = [];
-      proxyRes.on('data', function(c) { chunks.push(c); });
-      proxyRes.on('end', function() {
-        var raw = Buffer.concat(chunks);
-        var ct = proxyRes.headers['content-type'] || 'application/octet-stream';
-        resolve({ statusCode: proxyRes.statusCode, contentType: ct, body: raw.toString('base64') });
+function proxyStreamPromise(url, method, token, portalForRefresh, macForRefresh, cmdForRefresh, transcode) {
+  var maxRedirects = 10;
+  var refreshAttempted = false;
+  function doFetch(currentUrl, depth) {
+    return new Promise(function(resolve, reject) {
+      if (depth > maxRedirects) return resolve({ statusCode: 504, contentType: 'application/json', body: JSON.stringify({ error: 'Too many redirects' }) });
+      var u = new URL(currentUrl);
+      if (u.hostname === 'localhost' || u.hostname === '127.0.0.1') return resolve({ statusCode: 502, contentType: 'application/json', body: JSON.stringify({ error: 'Localhost in stream URL' }) });
+      var mod = u.protocol === 'https:' ? https : http;
+      var headers = {
+        'User-Agent': 'Mozilla/5.0 (QtEmbedded; U; Linux; C) AppleWebKit/533.3 (KHTML, like Gecko) MAG200 stbapp ver: 2 rev: 250 Safari/533.3',
+        'Accept': '*/*', 'Referer': portalForRefresh || url,
+        'Origin': portalForRefresh ? portalForRefresh.replace(/\/+$/, '') : url.replace(/\/[^/]*$/, ''),
+      };
+      var macMatch = u.search.match(/[?&]mac=([^&]+)/i);
+      if (macMatch) headers['Cookie'] = 'mac=' + macMatch[1];
+      else if (macForRefresh) headers['Cookie'] = 'mac=' + macForRefresh;
+      if (token) headers['Authorization'] = 'Bearer ' + token;
+      var opts = {
+        hostname: u.hostname, port: u.port || (u.protocol === 'https:' ? 443 : 80),
+        path: u.pathname + u.search, method: method, headers: headers,
+        rejectUnauthorized: false, timeout: 30000,
+      };
+      var req = mod.request(opts, function(proxyRes) {
+        if (proxyRes.statusCode >= 300 && proxyRes.statusCode < 400 && proxyRes.headers.location) {
+          var loc = proxyRes.headers.location;
+          if (!loc.startsWith('http')) { try { loc = new URL(loc, currentUrl).toString(); } catch(e) { loc = currentUrl; } }
+          proxyRes.resume();
+          return resolve(doFetch(loc, depth + 1));
+        }
+        if ((proxyRes.statusCode === 458 || proxyRes.statusCode === 462 || proxyRes.statusCode === 403) && !refreshAttempted && portalForRefresh && macForRefresh && token) {
+          proxyRes.resume(); refreshAttempted = true;
+          return resolve(stbCreateLink(portalForRefresh, macForRefresh, token, cmdForRefresh || currentUrl).then(function(newInfo) {
+            if (!newInfo || !newInfo.url) return { statusCode: 502, contentType: 'application/json', body: JSON.stringify({ error: 'Token refresh failed' }) };
+            return doFetch(newInfo.url, 0);
+          }).catch(function(e) { return { statusCode: 502, contentType: 'application/json', body: JSON.stringify({ error: 'Refresh error: ' + e.message }) }; }));
+        }
+        var chunks = [];
+        proxyRes.on('data', function(c) { chunks.push(c); });
+        proxyRes.on('end', function() {
+          var raw = Buffer.concat(chunks);
+          var ct = proxyRes.headers['content-type'] || 'application/octet-stream';
+          resolve({ statusCode: proxyRes.statusCode, contentType: ct, body: raw.toString('base64'), isBase64Encoded: true });
+        });
       });
+      req.on('error', function(err) { resolve({ statusCode: 502, contentType: 'application/json', body: JSON.stringify({ error: 'Proxy: ' + err.message }) }); });
+      req.on('timeout', function() { req.destroy(); resolve({ statusCode: 504, contentType: 'application/json', body: JSON.stringify({ error: 'Proxy timeout' }) }); });
+      req.end();
     });
-    req.on('error', reject);
-    req.on('timeout', function() { req.destroy(); reject(new Error('Timeout')); });
-    req.end();
-  });
+  }
+  return doFetch(url, 0);
 }
 
 exports.handler = streamHandler;

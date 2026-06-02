@@ -9,7 +9,11 @@ var ffmpegPath = null;
 function getFfmpeg() {
   if (ffmpegPath !== null) return ffmpegPath || null;
   try {
-    var r = require('child_process').execSync('which ffmpeg').toString().trim();
+    var staticPath = require('ffmpeg-static');
+    if (staticPath) { ffmpegPath = staticPath; return staticPath; }
+  } catch(e) {}
+  try {
+    var r = require('child_process').execSync('which ffmpeg 2>/dev/null || where ffmpeg 2>nul').toString().trim();
     if (r) { ffmpegPath = r; return r; }
   } catch(e) {}
   ffmpegPath = false;
@@ -385,6 +389,13 @@ module.exports = async function(req, res) {
   try { body = JSON.parse(body || '{}'); } catch(e) { body = {}; }
 
   if (reqPath === '/api/status') return sendJson(res, 200, { ok: true, ffmpeg: !!getFfmpeg(), node: process.version });
+
+  if (reqPath === '/proxy/stream' && method === 'GET') {
+    var proxyQ = require('url').parse(req.url, true).query;
+    if (!proxyQ.url) return sendJson(res, 400, { error: 'Missing url' });
+    proxyStream(res, proxyQ.url, 'GET', proxyQ.token || '', proxyQ.portal || '', proxyQ.mac || '', proxyQ.cmd || '', proxyQ.transcode === 'true' || proxyQ.transcode === '1');
+    return;
+  }
 
   if (reqPath === '/fetch' && method === 'GET') {
     var target = require('url').parse(req.url, true).query.url;
