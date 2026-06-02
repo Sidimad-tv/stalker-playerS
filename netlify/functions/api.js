@@ -310,20 +310,20 @@ async function streamHandler(event, context) {
 
   if (path === '/api/status') return Promise.resolve(jsonResponse(200, { ok: true, ffmpeg: !!getFfmpeg(), node: process.version }));
 
-  if (path === '/api/stalker/stream-get' && method === 'GET') {
-    var sg = event.queryStringParameters || {};
-    if (!sg.url) return Promise.resolve(jsonResponse(400, { error: 'Missing url' }));
-    return proxyStreamPromise(sg.url, 'GET', sg.token || '', sg.portal || '', sg.mac || '', sg.cmd || '', sg.transcode === 'true' || sg.transcode === '1').then(function(r) {
-      return { statusCode: r.statusCode, headers: { 'Content-Type': r.contentType, 'Access-Control-Allow-Origin': '*' }, body: r.body, isBase64Encoded: r.isBase64Encoded || false };
-    });
+  // Stream proxy endpoints: return 302 redirect so browser fetches directly (portal supports CORS)
+  function streamRedirect(url) {
+    return { statusCode: 302, headers: { Location: url, 'Access-Control-Allow-Origin': '*' }, body: '' };
   }
 
-  if (path === '/proxy/stream' && method === 'GET') {
-    var proxyQ = event.queryStringParameters || {};
-    if (!proxyQ.url) return Promise.resolve(jsonResponse(400, { error: 'Missing url' }));
-    return proxyStreamPromise(proxyQ.url, 'GET', proxyQ.token || '', proxyQ.portal || '', proxyQ.mac || '', proxyQ.cmd || '', proxyQ.transcode === 'true' || proxyQ.transcode === '1').then(function(r) {
-      return { statusCode: r.statusCode, headers: { 'Content-Type': r.contentType, 'Access-Control-Allow-Origin': '*' }, body: r.body, isBase64Encoded: r.isBase64Encoded || false };
-    });
+  if ((path === '/api/stalker/stream-get' || path === '/proxy/stream') && method === 'GET') {
+    var sg = event.queryStringParameters || {};
+    if (!sg.url) return Promise.resolve(jsonResponse(400, { error: 'Missing url' }));
+    return Promise.resolve(streamRedirect(sg.url));
+  }
+
+  if (path === '/api/stalker/stream-proxy' && method === 'POST') {
+    if (!body.url) return Promise.resolve(jsonResponse(400, { error: 'url required' }));
+    return Promise.resolve(streamRedirect(body.url));
   }
 
   if (path === '/fetch' && method === 'GET') {
@@ -453,15 +453,6 @@ async function streamHandler(event, context) {
           return jsonResponse(200, { url: streamInfo.url, contentType: streamInfo.contentType });
         });
       }).catch(function(e) { return jsonResponse(502, { ok: false, error: e.message }); });
-    }
-
-    if (action === 'stream-proxy') {
-      var streamUrl = body.url;
-      if (!streamUrl) return Promise.resolve(jsonResponse(400, { error: 'url required' }));
-      var mseToken = body.token || '';
-      return proxyStreamPromise(streamUrl, 'GET', mseToken, '', '', '', false).then(function(r) {
-        return { statusCode: r.statusCode, headers: { 'Content-Type': r.contentType, 'Access-Control-Allow-Origin': '*' }, body: r.body, isBase64Encoded: r.isBase64Encoded || false };
-      });
     }
 
     return Promise.resolve(jsonResponse(404, { error: 'Unknown action: ' + action }));
