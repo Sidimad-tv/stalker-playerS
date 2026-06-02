@@ -322,6 +322,16 @@ async function streamHandler(event, context) {
     return Promise.resolve({ statusCode: 302, headers: { Location: 'https://stalker-p.vercel.app/api/stalker/stream-get?' + params, 'Access-Control-Allow-Origin': '*' }, body: '' });
   }
 
+  // Proxy Stalker API requests (handshake, get_ordered_list, etc.) through Vercel
+  if (path === '/api/stalker/proxy' && method === 'GET') {
+    var pq = event.queryStringParameters || {};
+    if (!pq.url) return Promise.resolve(jsonResponse(400, { error: 'Missing url' }));
+    var params = 'url=' + encodeURIComponent(pq.url);
+    if (pq.mac) params += '&mac=' + encodeURIComponent(pq.mac);
+    if (pq.token) params += '&token=' + encodeURIComponent(pq.token);
+    return Promise.resolve({ statusCode: 302, headers: { Location: 'https://stalker-p.vercel.app/api/stalker/proxy?' + params, 'Access-Control-Allow-Origin': '*' }, body: '' });
+  }
+
   // stream-proxy is handled client-side (frontend POSTs to Vercel directly)
   if (path === '/api/stalker/stream-proxy' && method === 'POST') {
     if (!body.url) return Promise.resolve(jsonResponse(400, { error: 'url required' }));

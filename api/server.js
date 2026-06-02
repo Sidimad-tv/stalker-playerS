@@ -414,6 +414,31 @@ module.exports = async function(req, res) {
     return;
   }
 
+  if (reqPath === '/api/stalker/proxy' && method === 'GET') {
+    var pq = require('url').parse(req.url, true).query;
+    if (!pq.url) return sendJson(res, 400, { error: 'Missing url' });
+    var pu = new URL(pq.url);
+    var pmod = pu.protocol === 'https:' ? https : http;
+    var popts = {
+      hostname: pu.hostname, port: pu.port || (pu.protocol === 'https:' ? 443 : 80),
+      path: pu.pathname + pu.search, method: 'GET',
+      headers: {
+        'User-Agent': 'Mozilla/5.0', 'Accept': '*/*',
+        'Cookie': pq.mac ? 'mac=' + pq.mac + '; stb_lang=en; timezone=Europe/London' : '',
+      },
+      rejectUnauthorized: false, timeout: 15000,
+    };
+    if (pq.token) popts.headers['Authorization'] = 'Bearer ' + pq.token;
+    if (pq.token) popts.headers['Cookie'] = (popts.headers['Cookie'] || '') + '; token=' + pq.token;
+    var prec = pmod.request(popts, function(pres) {
+      res.writeHead(pres.statusCode, { 'Content-Type': pres.headers['content-type'] || 'application/octet-stream', 'Access-Control-Allow-Origin': '*' });
+      pres.pipe(res);
+    });
+    prec.on('error', function(e) { sendJson(res, 502, { error: e.message }); });
+    prec.end();
+    return;
+  }
+
   if (reqPath.indexOf('/api/stalker/') === 0) {
     var action = reqPath.replace('/api/stalker/', '');
     if (method !== 'POST') return sendJson(res, 405, { error: 'Method not allowed' });

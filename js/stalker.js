@@ -64,40 +64,51 @@ class StalkerClient {
     }
 
     async _request(action, extraParams = {}) {
-        const urlObj = new URL(this.portalUrl);
+        var urlObj = new URL(this.portalUrl);
 
         // Build query params (mac/token go in headers, not URL)
-        const params = { action: action };
-        for (const [key, value] of Object.entries(extraParams)) {
-            params[key] = value;
+        var params = { action: action };
+        for (var key in extraParams) {
+            if (extraParams.hasOwnProperty(key)) params[key] = extraParams[key];
         }
 
-        for (const [key, value] of Object.entries(params)) {
-            urlObj.searchParams.append(key, value);
+        for (var key in params) {
+            if (params.hasOwnProperty(key)) urlObj.searchParams.append(key, params[key]);
         }
 
-        const requestUrl = urlObj.toString();
-        console.log(`[Stalker] Calling ${action}`);
+        var requestUrl = urlObj.toString();
+        console.log('[Stalker] Calling ' + action);
 
         this.requestCount++;
 
         try {
-            const response = await fetch(requestUrl, {
-                method: 'GET',
-                headers: {
-                    'Accept': '*/*',
-                    'User-Agent': 'Mozilla/5.0 (QtEmbedded; U; Linux; C) AppleWebKit/533.3 (KHTML, like Gecko) MAG200 stbapp ver: 2 rev: 250 Safari/533.3',
-                    'X-User-Agent': 'Model: MAG200; Link: Ethernet',
-                    'Cookie': 'mac=' + this.mac + '; stb_lang=en; timezone=Europe/London' + (this.token ? '; token=' + this.token : ''),
-                    ...(this.token ? { 'Authorization': 'Bearer ' + this.token } : {}),
-                }
-            });
+            // On live sites (Vercel/Netlify), proxy through Vercel to avoid CORS/mixed-content
+            var hostname = window.location.hostname;
+            var isLocal = hostname === 'localhost' || hostname === '127.0.0.1';
+            var response;
+            if (!isLocal) {
+                var proxyBase = hostname.indexOf('vercel') !== -1 ? '' : 'https://stalker-p.vercel.app';
+                var proxyUrl = proxyBase + '/api/stalker/proxy?url=' + encodeURIComponent(requestUrl) + '&mac=' + encodeURIComponent(this.mac);
+                if (this.token) proxyUrl += '&token=' + encodeURIComponent(this.token);
+                response = await fetch(proxyUrl);
+            } else {
+                response = await fetch(requestUrl, {
+                    method: 'GET',
+                    headers: {
+                        'Accept': '*/*',
+                        'User-Agent': 'Mozilla/5.0 (QtEmbedded; U; Linux; C) AppleWebKit/533.3 (KHTML, like Gecko) MAG200 stbapp ver: 2 rev: 250 Safari/533.3',
+                        'X-User-Agent': 'Model: MAG200; Link: Ethernet',
+                        'Cookie': 'mac=' + this.mac + '; stb_lang=en; timezone=Europe/London' + (this.token ? '; token=' + this.token : ''),
+                        ...(this.token ? { 'Authorization': 'Bearer ' + this.token } : {}),
+                    }
+                });
+            }
 
             if (!response.ok) {
                 throw new Error('HTTP Error ' + response.status);
             }
 
-            const text = await response.text();
+            var text = await response.text();
             try {
                 return JSON.parse(text);
             } catch (e) {
