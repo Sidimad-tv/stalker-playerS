@@ -193,6 +193,11 @@ app.all('/api/stalker/itv', function(req, res) {
   }).catch(function(err) { res.status(500).json({ error: err.message }); });
 });
 
+app.get('/api/status', function(req, res) {
+  var fp = detectFfmpeg();
+  res.json({ ok: true, ffmpeg: !!fp, env: process.env.NODE_ENV || 'unknown' });
+});
+
 var wrapped = serverless(app);
 module.exports = app;
 module.exports.handler = wrapped;
