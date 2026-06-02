@@ -313,7 +313,7 @@ async function streamHandler(event, context) {
 
   // Netlify can't stream. Redirect stream-get to Vercel (omit portal/mac to avoid routing issues).
   // stream-proxy is handled client-side (frontend POSTs to Vercel directly - CORS is fine).
-  if ((path === '/api/stalker/stream-get' || path === '/proxy/stream') && method === 'GET') {
+  if ((path === '/api/stalker/stream-get' || path === '/proxy/stream') && (method === 'GET' || method === 'HEAD')) {
     var sg = event.queryStringParameters || {};
     if (!sg.url) return Promise.resolve(jsonResponse(400, { error: 'Missing url' }));
     var params = 'url=' + encodeURIComponent(sg.url);
