@@ -2,8 +2,7 @@
   "version": 2,
   "functions": {
     "api/server.js": {
-      "maxDuration": 60,
-      "excludeFiles": "node_modules/ffmpeg-static/**"
+      "maxDuration": 60
     }
   },
   "rewrites": [
