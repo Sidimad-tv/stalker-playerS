@@ -200,9 +200,9 @@ class StalkerClient {
         return [];
     }
 
-    async getVodCategories() {
+    async getVodCategories(type) {
         const data = await this._request('get_categories', {
-            'type': 'vod'
+            'type': type || 'vod'
         });
 
         if (data && data.js) {
@@ -216,9 +216,9 @@ class StalkerClient {
         return [];
     }
 
-    async getVodList(categoryId = null) {
+    async getVodList(categoryId, type) {
         const params = {
-            'type': 'vod',
+            'type': type || 'vod',
             'action': 'get_ordered_list',
             'p': 1 // simple pagination, page 1
         };
