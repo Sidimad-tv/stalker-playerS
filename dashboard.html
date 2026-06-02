@@ -168,13 +168,13 @@ input, button { font: inherit; }
         </div>
         <form id="login-form" class="lg-form">
             <div id="lg-stalker">
-                <input type="url" id="portal-url" placeholder="Portal URL" required>
-                <input type="text" id="mac-addr" placeholder="MAC Address (00:1A:79:XX:XX:XX)" required>
+                <input type="url" id="portal-url" placeholder="Portal URL">
+                <input type="text" id="mac-addr" placeholder="MAC Address (00:1A:79:XX:XX:XX)">
             </div>
             <div id="lg-xtream" class="hidden">
-                <input type="url" id="xtream-url" placeholder="Xtream Server URL" required>
-                <input type="text" id="xtream-user" placeholder="Username" required>
-                <input type="password" id="xtream-pass" placeholder="Password" required>
+                <input type="url" id="xtream-url" placeholder="Xtream Server URL">
+                <input type="text" id="xtream-user" placeholder="Username">
+                <input type="password" id="xtream-pass" placeholder="Password">
             </div>
             <button type="submit" id="connect-btn">Connect</button>
         </form>
@@ -362,8 +362,11 @@ document.addEventListener('DOMContentLoaded', function() {
             qa('[data-lgtab]').forEach(function(b) { b.classList.remove('active'); });
             btn.classList.add('active');
             var t = btn.getAttribute('data-lgtab');
-            ui.lgStalker.classList.toggle('hidden', t !== 'stalker');
-            ui.lgXtream.classList.toggle('hidden', t !== 'xtream');
+        ui.lgStalker.classList.toggle('hidden', t !== 'stalker');
+        ui.lgXtream.classList.toggle('hidden', t !== 'xtream');
+        // Disable hidden inputs so browser doesn't validate them
+        qa('input', ui.lgStalker).forEach(function(inp) { inp.disabled = t !== 'stalker'; });
+        qa('input', ui.lgXtream).forEach(function(inp) { inp.disabled = t !== 'xtream'; });
         });
     });
 
@@ -402,24 +405,25 @@ document.addEventListener('DOMContentLoaded', function() {
                 client = new StalkerClient(portal, mac);
                 await client.authenticate(user, pass);
             } else {
-                // Xtream Codes API
+                // Xtream Codes API (through proxy to avoid CORS)
                 xtream.mode = true;
                 xtream.base = portal.replace(/\/+$/,'');
                 xtream.user = user;
                 xtream.pass = pass;
-                // Test connection
+                // Test connection via proxy
                 var testUrl = xtream.base + '/player_api.php?username=' + encodeURIComponent(user) + '&password=' + encodeURIComponent(pass);
-                var testResp = await fetch(testUrl);
+                var proxyPre = location.hostname.indexOf('vercel') !== -1 ? '' : 'https://stalker-p.vercel.app';
+                var testResp = await fetch(proxyPre + '/api/stalker/proxy?url=' + encodeURIComponent(testUrl));
                 var testData = await testResp.json();
-                if (!testData || testData.user_info === undefined) throw new Error('Invalid Xtream credentials');
-                // Stub client for createLink (Xtream URLs are direct)
+                if (!testData || testData.user_info === undefined || !testData.user_info.auth) throw new Error('Invalid Xtream credentials');
+                // Stub client for createLink - Xtream URLs are direct, no proxy needed
                 client = { token: 'xtream', xtreamMode: true, createLink: function(cmd) { return Promise.resolve(cmd); } };
             }
             setStatus('Connected!');
             showScreen('main-screen');
             switchMode('tv');
         } catch(e) {
-            setStatus('Failed: ' + e.message, true);
+            setStatus('✗ ' + e.message, true);
             console.error(e);
         }
         ui.connectBtn.disabled = false;
@@ -482,7 +486,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
         async function xtFetch(act) {
             var u = xtream.base + '/player_api.php?username=' + encodeURIComponent(xtream.user) + '&password=' + encodeURIComponent(xtream.pass) + '&action=' + act;
-            var r = await fetch(u);
+            var proxyPre = location.hostname.indexOf('vercel') !== -1 ? '' : 'https://stalker-p.vercel.app';
+            var r = await fetch(proxyPre + '/api/stalker/proxy?url=' + encodeURIComponent(u));
             return r.json();
         }
 
