@@ -427,7 +427,7 @@ function loadStream(url, contentType, originalCmd) {
     var originalUrl = url;
     var isCrossOrigin = url.indexOf(location.protocol + '//' + location.host) !== 0 && url.indexOf('//' + location.host) === -1;
     if (isCrossOrigin) {
-        var sgBase = window.location.hostname.indexOf('vercel') !== -1 ? '/stm/stream-get' : 'https://stalker-p.vercel.app/stm/stream-get';
+        var sgBase = window.location.hostname.indexOf('vercel') !== -1 ? '/api/stalker/stream-get' : 'https://stalker-p.vercel.app/api/stalker/stream-get';
         url = sgBase + '?url=' + encodeURIComponent(url) + '&token=' + encodeURIComponent(portalToken || '');
     }
 

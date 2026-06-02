@@ -19,9 +19,5 @@
       "source": "/fetch",
       "destination": "/api/server.js"
     },
-    {
-      "source": "/stm/:path*",
-      "destination": "/api/server.js"
-    }
   ]
 }
