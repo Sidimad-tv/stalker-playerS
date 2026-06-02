@@ -298,7 +298,7 @@ function stbFetchGenres(base, mac, token, mediaType) {
   }).catch(function() { return {}; });
 }
 
-function streamHandler(event, context, callback) {
+async function streamHandler(event, context) {
   var path = event.path.replace(/^\/\.netlify\/functions\/[^\/]+/, '');
   var method = event.httpMethod;
   var body = {};
