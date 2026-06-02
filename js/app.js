@@ -580,30 +580,6 @@ document.addEventListener('DOMContentLoaded', () => {
             showStatus("Error playing video: " + e.message, "error");
         }
     }
-                    },
-                    onSuccess: function (res) {
-                        console.log("Launched native player:", res);
-                    },
-                    onFailure: function (err) {
-                        console.error("Failed to launch native player:", err);
-                        // Fallback to HTML5 video -> Use Proxy
-                        playWithHtml5(cleanUrl);
-                    }
-                });
-            } else {
-                // Fallback for browser/simulator without Luna
-                playWithHtml5(cleanUrl);
-            }
-
-            showScreen('player');
-            // ui.backBtn is removed, rely on document key handler
-            currentFocus = null;
-            showStatus("Playing...", "success");
-        } catch (e) {
-            console.error("Play error:", e);
-            showStatus("Error playing video: " + e.message, "error");
-        }
-    }
 
     function playWithHtml5(url) {
         const video = ui.videoPlayer;
