@@ -119,7 +119,7 @@ function proxyStream(url, method, token, portal, mac, cmd, transcode) {
 }
 
 exports.handler = async function(event, context) {
-  var path = event.path;
+  var path = event.path.replace(/^\/\.netlify\/functions\/[^\/]+/, '');
   var method = event.httpMethod;
   var body = parseBody(event);
   

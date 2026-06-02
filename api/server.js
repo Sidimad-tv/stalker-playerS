@@ -2,6 +2,8 @@ var http = require('http');
 var https = require('https');
 var crypto = require('crypto');
 var spawn = require('child_process').spawn;
+var fs = require('fs');
+var pathModule = require('path');
 
 var ffmpegPath = null;
 function getFfmpeg() {
@@ -173,5 +175,19 @@ module.exports = async function(req, res) {
     } catch(e) { return jsonResponse(502, { error: e.message }); }
   }
   
+  try {
+    var rootDir = pathModule.resolve(__dirname, '..');
+    var relative = path === '/' ? 'index.html' : path.slice(1);
+    var safePath = pathModule.resolve(rootDir, relative);
+    if (safePath.indexOf(rootDir) !== 0) return jsonResponse(403, { error: 'Forbidden' });
+    var stat = fs.statSync(safePath);
+    if (stat.isFile()) {
+      var ext = pathModule.extname(safePath).toLowerCase();
+      var mime = { '.html': 'text/html', '.css': 'text/css', '.js': 'application/javascript', '.json': 'application/json', '.png': 'image/png', '.jpg': 'image/jpeg', '.svg': 'image/svg+xml', '.ico': 'image/x-icon' }[ext] || 'application/octet-stream';
+      res.writeHead(200, { 'Content-Type': mime, 'Access-Control-Allow-Origin': '*' });
+      res.end(fs.readFileSync(safePath));
+      return;
+    }
+  } catch(e) { return jsonResponse(500, { error: 'Static: ' + e.message }); }
   return jsonResponse(404, { error: 'Not found' });
 };
