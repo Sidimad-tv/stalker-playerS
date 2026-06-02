@@ -682,12 +682,14 @@ window.onerror = function(msg, src, line, col, err) {
     var mOk = typeof mpegts !== 'undefined' && mpegts.isSupported && mpegts.isSupported();
 
     try {
-      if (isTS(cmd) && mOk) {
+      var tryTs = isTS(url) || isTS(pUrl);
+      var tryM3u = isM3U(url) || isM3U(pUrl);
+      if (tryTs && mOk) {
         S.pvMpegts = mpegts.createPlayer({ type: 'mpegts', isLive: true, url: pUrl });
         S.pvMpegts.attachMediaElement(ui.pvVideo);
         S.pvMpegts.load();
         S.pvMpegts.on(mpegts.Events.ERROR, function() { destroyPv(); });
-      } else if (isM3U(cmd) && hOk) {
+      } else if (tryM3u && hOk) {
         S.pvHls = new Hls({ debug: false });
         S.pvHls.loadSource(pUrl);
         S.pvHls.attachMedia(ui.pvVideo);
@@ -767,8 +769,11 @@ window.onerror = function(msg, src, line, col, err) {
 
     var self = this;
 
+    var tryTs = isTS(url) || isTS(pUrl);
+    var tryM3u = isM3U(url) || isM3U(pUrl);
+
     function tryMpegts() {
-      if (!isTS(cmd) || typeof mpegts === 'undefined' || !mpegts.isSupported || !mpegts.isSupported()) { tryHls(); return; }
+      if (!tryTs || typeof mpegts === 'undefined' || !mpegts.isSupported || !mpegts.isSupported()) { tryHls(); return; }
       S.plMpegts = mpegts.createPlayer({ type: 'mpegts', isLive: true, url: pUrl });
       S.plMpegts.attachMediaElement(ui.plVideo);
       S.plMpegts.load();
@@ -781,7 +786,7 @@ window.onerror = function(msg, src, line, col, err) {
     }
 
     function tryHls() {
-      if (!isM3U(cmd) || typeof Hls === 'undefined' || !Hls.isSupported) { tryNative(); return; }
+      if (!tryM3u || typeof Hls === 'undefined' || !Hls.isSupported) { tryNative(); return; }
       S.plHls = new Hls({ debug: false, enableWorker: true, lowLatencyMode: true });
       S.plHls.loadSource(url);
       S.plHls.attachMedia(ui.plVideo);
@@ -802,8 +807,8 @@ window.onerror = function(msg, src, line, col, err) {
       setTimeout(function() { ui.plLoad.classList.add('hidden'); }, 3000);
     }
 
-    if (isTS(cmd)) { tryMpegts(); }
-    else if (isM3U(cmd)) { tryHls(); }
+    if (tryTs) { tryMpegts(); }
+    else if (tryM3u) { tryHls(); }
     else { tryNative(); }
   }
 
