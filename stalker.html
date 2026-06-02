@@ -234,7 +234,9 @@ function getAvailablePlayers() {
     var players = { shaka: false, hls: false, mpegts: false, native: true };
     try { if (shaka && shaka.Player && typeof shaka !== 'undefined') players.shaka = true; } catch(e) {}
     try { if (Hls && Hls.isSupported && Hls.isSupported()) players.hls = true; } catch(e) {}
-    try { if (mpegts && mpegts.isSupported && mpegts.isSupported()) players.mpegts = true; } catch(e) {}
+    // Skip mpegts on Firefox (cors preflight slows playback). Native works fine.
+    var isFirefox = navigator.userAgent.indexOf('Firefox') !== -1;
+    try { if (!isFirefox && mpegts && mpegts.isSupported && mpegts.isSupported()) players.mpegts = true; } catch(e) {}
     return players;
 }
 
