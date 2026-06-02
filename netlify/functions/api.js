@@ -321,21 +321,11 @@ async function streamHandler(event, context) {
     if (sg.cmd) params += '&cmd=' + encodeURIComponent(sg.cmd);
     return Promise.resolve({ statusCode: 302, headers: { Location: 'https://stalker-p.vercel.app/api/stalker/stream-get?' + params, 'Access-Control-Allow-Origin': '*' }, body: '' });
   }
-      return { statusCode: proxyResp.status, headers: { 'Content-Type': contentType, 'Access-Control-Allow-Origin': '*' }, body: proxyResp.body };
-    } catch(e) {
-      return jsonResponse(502, { error: 'Vercel proxy error: ' + e.message });
-    }
-  }
 
-  if ((path === '/api/stalker/stream-get' || path === '/proxy/stream') && method === 'GET') {
-    var sg = event.queryStringParameters || {};
-    if (!sg.url) return Promise.resolve(jsonResponse(400, { error: 'Missing url' }));
-    return proxyViaVercel(sg, 'GET', null);
-  }
-
+  // stream-proxy is handled client-side (frontend POSTs to Vercel directly)
   if (path === '/api/stalker/stream-proxy' && method === 'POST') {
     if (!body.url) return Promise.resolve(jsonResponse(400, { error: 'url required' }));
-    return proxyViaVercel(null, 'POST', body);
+    return Promise.resolve(jsonResponse(501, { error: 'Use Vercel directly for streams: https://stalker-p.vercel.app/api/stalker/stream-proxy' }));
   }
 
   if (path === '/fetch' && method === 'GET') {
