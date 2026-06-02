@@ -637,7 +637,7 @@ window.onerror = function(msg, src, line, col, err) {
       card.addEventListener('click', function() {
         qa('.card').forEach(function(c) { c.classList.remove('sel'); });
         card.classList.add('sel');
-        selectCh(ch);
+        openPlayer(ch);
       });
       div.appendChild(card);
     });
