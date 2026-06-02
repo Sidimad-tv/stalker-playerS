@@ -504,6 +504,29 @@ function savePortal(p) {
                 return;
             }
             if (mode === 'tv') {
+                var genres = await client.getGenres();
+                catMap = {}; catList = [];
+                genres.forEach(function(g) { catMap[g.id] = g.title; catList.push(g.id); });
+                catList.sort(function(a,b) { return (catMap[a]||'').localeCompare(catMap[b]||''); });
+                renderCats();
+                var channels = await client.getChannels();
+                allItems = channels.map(function(ch) {
+                    return { name: ch.name, cmd: ch.url, num: ch.number, logo: ch.logo || '', genre_id: String(ch.genre_id || '') };
+                });
+                renderList(allItems);
+            } else {
+                var type = mode === 'series' ? 'series' : 'vod';
+                var genres = await client.getVodCategories(type);
+                catMap = {}; catList = [];
+                genres.forEach(function(g) { catMap[g.id] = g.title; catList.push(g.id); });
+                catList.sort(function(a,b) { return (catMap[a]||'').localeCompare(catMap[b]||''); });
+                renderCats();
+                var items = await client.getVodList('all', type);
+                allItems = items.map(function(m) {
+                    return { name: m.name, cmd: m.url, num: m.number || '', logo: m.logo || '', genre_id: String(m.genre_id || m.category_id || '') };
+                });
+                renderList(allItems);
+            }
         } catch(e) {
             console.error('Load error:', e);
             ui.listArea.innerHTML = '<div class="empty-state"><div class="es-icon">⚠</div><div>' + escapeHtml(e.message) + '</div></div>';
