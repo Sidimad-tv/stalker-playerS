@@ -244,6 +244,13 @@ a{color:var(--accent);text-decoration:none}
 </div>
 
 <script>
+window.onerror = function(msg, src, line, col, err) {
+  var el = document.getElementById('status');
+  if (el) el.textContent = 'JS Error: ' + msg + ' (' + src + ':' + line + ')';
+  if (el) el.style.color = '#f55';
+  console.error('GLOBAL ERROR:', msg, src, line, col, err);
+};
+
 (function() {
   'use strict';
 
@@ -398,10 +405,13 @@ a{color:var(--accent);text-decoration:none}
     ui.connectBtn.disabled = true;
     ui.connectBtn.textContent = 'Connecting...';
     setSt('Connecting...');
+    console.log('[Stellar] Connecting:', type, portal, mac, user);
     try {
       if (type === 'stalker') {
         S.client = new StalkerClient(portal, mac);
+        console.log('[Stellar] Starting authenticate...');
         await S.client.authenticate(user, pass);
+        console.log('[Stellar] Auth done, token:', S.client.token ? S.client.token.substring(0, 10) + '...' : 'none');
         if (!S.client.token) throw new Error('No token after handshake');
       } else {
         S.xtream.mode = true;
@@ -485,32 +495,41 @@ a{color:var(--accent);text-decoration:none}
         return;
       }
       if (mode === 'tv') {
+        console.log('[Stellar] Loading TV genres...');
         var genres = await S.client.getGenres();
+        console.log('[Stellar] Genres result:', genres ? genres.length : 'null', genres);
         S.catMap = {};
         S.catList = [];
-        genres.forEach(function(g) { S.catMap[g.id] = g.title; S.catList.push(g.id); });
+        if (genres) genres.forEach(function(g) { S.catMap[g.id] = g.title; S.catList.push(g.id); });
         S.catList.sort(function(a, b) { return (S.catMap[a] || '').localeCompare(S.catMap[b] || ''); });
         renderCats();
+        console.log('[Stellar] Loading TV channels...');
         var channels = await S.client.getChannels();
-        S.allItems = channels.map(function(ch) {
+        console.log('[Stellar] Channels result:', channels ? channels.length : 'null', channels ? channels[0] : null);
+        S.allItems = channels ? channels.map(function(ch) {
           return { name: ch.name, cmd: ch.url, num: ch.number, logo: ch.logo || '', genre_id: String(ch.genre_id || '') };
-        });
+        }) : [];
         renderList(S.allItems);
       } else {
         var type = mode === 'series' ? 'series' : 'vod';
+        console.log('[Stellar] Loading ' + type + ' categories...');
         var genres = await S.client.getVodCategories(type);
+        console.log('[Stellar] VodCategories result:', genres ? genres.length : 'null');
         S.catMap = {};
         S.catList = [];
-        genres.forEach(function(g) { S.catMap[g.id] = g.title; S.catList.push(g.id); });
+        if (genres) genres.forEach(function(g) { S.catMap[g.id] = g.title; S.catList.push(g.id); });
         S.catList.sort(function(a, b) { return (S.catMap[a] || '').localeCompare(S.catMap[b] || ''); });
         renderCats();
+        console.log('[Stellar] Loading ' + type + ' items...');
         var items = await S.client.getVodList('all', type);
-        S.allItems = items.map(function(m) {
+        console.log('[Stellar] VodList result:', items ? items.length : 'null', items ? items[0] : null);
+        S.allItems = items ? items.map(function(m) {
           return { name: m.name, cmd: m.url, num: m.number || '', logo: m.logo || '', genre_id: String(m.genre_id || m.category_id || '') };
-        });
+        }) : [];
         renderList(S.allItems);
       }
     } catch(e) {
+      console.error('[Stellar] switchMode error:', e);
       ui.list.innerHTML = '<div class="empty"><div class="ic">⚠</div><div>' + esc(e.message) + '</div></div>';
     }
   }
