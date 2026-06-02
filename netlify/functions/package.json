@@ -1,8 +1,4 @@
 {
   "name": "netlify-functions",
-  "version": "1.0.0",
-  "dependencies": {
-    "express": "^5.2.1",
-    "serverless-http": "^4.0.0"
-  }
+  "version": "1.0.0"
 }
