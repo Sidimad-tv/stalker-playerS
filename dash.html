@@ -314,9 +314,18 @@ window.onerror = function(msg, src, line, col, err) {
     $(id).classList.add('active');
   }
 
+  function log(msg, isErr) {
+    console.log('[Stellar]', msg);
+    var el = document.createElement('div');
+    el.textContent = msg;
+    el.style.cssText = 'font-size:11px;padding:2px 0;color:' + (isErr ? '#f55' : '#00d4a0');
+    ui.status.appendChild(el);
+    ui.status.scrollTop = ui.status.scrollHeight;
+  }
+
   function setSt(s, err) {
-    ui.status.textContent = s;
-    ui.status.style.color = err ? '#f55' : '#00d4a0';
+    ui.status.textContent = '';
+    log(s, err);
   }
 
   function isTS(u) { return /\.ts\b|extension=ts|\.m2ts/i.test(u); }
@@ -405,13 +414,13 @@ window.onerror = function(msg, src, line, col, err) {
     ui.connectBtn.disabled = true;
     ui.connectBtn.textContent = 'Connecting...';
     setSt('Connecting...');
-    console.log('[Stellar] Connecting:', type, portal, mac, user);
+    log('Connecting: ' + type + ' @ ' + portal);
     try {
       if (type === 'stalker') {
         S.client = new StalkerClient(portal, mac);
-        console.log('[Stellar] Starting authenticate...');
+        log('Authenticating (handshake)...');
         await S.client.authenticate(user, pass);
-        console.log('[Stellar] Auth done, token:', S.client.token ? S.client.token.substring(0, 10) + '...' : 'none');
+        log('Auth done, token=' + (S.client.token ? S.client.token.substring(0, 8) + '...' : 'NONE'));
         if (!S.client.token) throw new Error('No token after handshake');
       } else {
         S.xtream.mode = true;
@@ -495,41 +504,43 @@ window.onerror = function(msg, src, line, col, err) {
         return;
       }
       if (mode === 'tv') {
-        console.log('[Stellar] Loading TV genres...');
+        log('Loading TV genres...');
         var genres = await S.client.getGenres();
-        console.log('[Stellar] Genres result:', genres ? genres.length : 'null', genres);
+        log('Genres: ' + (genres ? genres.length + ' items' : 'null'));
+        if (genres && genres.length > 0) log('  e.g. ' + genres[0].title + ' (id=' + genres[0].id + ')');
         S.catMap = {};
         S.catList = [];
         if (genres) genres.forEach(function(g) { S.catMap[g.id] = g.title; S.catList.push(g.id); });
         S.catList.sort(function(a, b) { return (S.catMap[a] || '').localeCompare(S.catMap[b] || ''); });
         renderCats();
-        console.log('[Stellar] Loading TV channels...');
+        log('Loading TV channels...');
         var channels = await S.client.getChannels();
-        console.log('[Stellar] Channels result:', channels ? channels.length : 'null', channels ? channels[0] : null);
+        log('Channels: ' + (channels ? channels.length + ' items' : 'null'));
+        if (channels && channels.length > 0) log('  e.g. ' + channels[0].name + ' url=' + (channels[0].url || '').substring(0, 40));
         S.allItems = channels ? channels.map(function(ch) {
           return { name: ch.name, cmd: ch.url, num: ch.number, logo: ch.logo || '', genre_id: String(ch.genre_id || '') };
         }) : [];
         renderList(S.allItems);
       } else {
         var type = mode === 'series' ? 'series' : 'vod';
-        console.log('[Stellar] Loading ' + type + ' categories...');
+        log('Loading ' + type + ' categories...');
         var genres = await S.client.getVodCategories(type);
-        console.log('[Stellar] VodCategories result:', genres ? genres.length : 'null');
+        log('Categories: ' + (genres ? genres.length + ' items' : 'null'));
         S.catMap = {};
         S.catList = [];
         if (genres) genres.forEach(function(g) { S.catMap[g.id] = g.title; S.catList.push(g.id); });
         S.catList.sort(function(a, b) { return (S.catMap[a] || '').localeCompare(S.catMap[b] || ''); });
         renderCats();
-        console.log('[Stellar] Loading ' + type + ' items...');
+        log('Loading ' + type + ' items...');
         var items = await S.client.getVodList('all', type);
-        console.log('[Stellar] VodList result:', items ? items.length : 'null', items ? items[0] : null);
+        log('Items: ' + (items ? items.length + ' items' : 'null'));
         S.allItems = items ? items.map(function(m) {
           return { name: m.name, cmd: m.url, num: m.number || '', logo: m.logo || '', genre_id: String(m.genre_id || m.category_id || '') };
         }) : [];
         renderList(S.allItems);
       }
     } catch(e) {
-      console.error('[Stellar] switchMode error:', e);
+      log('ERROR: ' + e.message, true);
       ui.list.innerHTML = '<div class="empty"><div class="ic">⚠</div><div>' + esc(e.message) + '</div></div>';
     }
   }
