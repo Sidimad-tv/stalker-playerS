@@ -248,25 +248,34 @@ class StalkerClient {
 
     async createLink(cmd) {
         console.log("[Stalker] createLink called with:", cmd);
+        var self = this;
 
-        // Parse "ffmpeg http://..." or "http://..." or "auto /path/to/stream"
-        let url = cmd;
-
-        if (cmd.startsWith("ffmpeg ")) {
-            url = cmd.split(" ")[1];
-            console.log("[Stalker] Extracted from ffmpeg:", url);
-        } else if (cmd.startsWith("auto ")) {
-            url = cmd.split(" ")[1];
-            console.log("[Stalker] Extracted from auto:", url);
+        // Helper to strip ffmpeg/auto/ffrt/ff prefixes
+        function stripPrefix(s) {
+            var m = s.match(/^(?:ffmpeg|auto|ffrt|ff)\s+(.+)/i);
+            return m ? m[1].trim() : s.trim();
         }
 
-        // If it's a direct HTTP stream, return it
-        if (url && url.startsWith("http")) {
+        // Rewrite localhost/127.0.0.1 in URLs to the portal host
+        function rewriteLocalhost(s) {
+            if (s.indexOf('localhost') === -1 && s.indexOf('127.0.0.1') === -1) return s;
+            try {
+                var pu = new URL(self.portal);
+                s = s.replace(/\/\/localhost(:\d+)?/gi, '//' + pu.hostname + (pu.port ? ':' + pu.port : ''));
+                s = s.replace(/\/\/127\.0\.0\.1(:\d+)?/gi, '//' + pu.hostname + (pu.port ? ':' + pu.port : ''));
+            } catch(e) {}
+            return s;
+        }
+
+        var url = stripPrefix(cmd);
+
+        // If it's a direct HTTP stream that does NOT point at localhost, return it
+        if (url && url.startsWith("http") && url.indexOf('localhost') === -1 && url.indexOf('127.0.0.1') === -1) {
             console.log("[Stalker] Direct URL:", url);
             return url;
         }
 
-        // If it's something else, we need to ask the server to translate it
+        // Call the portal's create_link API (required for localhost URLs and non-HTTP cmds)
         console.log("[Stalker] Calling create_link API for:", cmd);
         const linkData = await this._request('create_link', {
             'cmd': cmd,
@@ -276,29 +285,29 @@ class StalkerClient {
         console.log("[Stalker] create_link response:", linkData);
 
         // Try multiple response formats
-        if (linkData && linkData.js) {
-            let streamUrl = null;
+        var allData = linkData;
+        // Some portals wrap in js, others return top-level
+        if (allData && allData.js) allData = allData.js;
 
-            // Format 1: linkData.js.cmd contains the URL
-            if (typeof linkData.js.cmd === 'string') {
-                streamUrl = linkData.js.cmd;
-                if (streamUrl.startsWith("ffmpeg ")) {
-                    streamUrl = streamUrl.split(" ")[1];
-                }
-            }
-            // Format 2: linkData.js is the URL directly
-            else if (typeof linkData.js === 'string' && linkData.js.startsWith('http')) {
-                streamUrl = linkData.js;
-            }
-
-            if (streamUrl && streamUrl.startsWith('http')) {
+        var streamUrl = null;
+        if (typeof allData === 'string' && allData.startsWith('http')) {
+            streamUrl = allData;
+        } else if (typeof allData === 'object') {
+            // Try various response properties
+            streamUrl = allData.cmd || allData.url || allData.stream || '';
+        }
+        if (streamUrl) {
+            streamUrl = stripPrefix(streamUrl);
+            if (streamUrl.startsWith('http')) {
                 console.log("[Stalker] Final stream URL:", streamUrl);
                 return streamUrl;
             }
         }
 
-        console.warn("[Stalker] Could not extract URL, returning original:", url);
-        return url; // Fallback
+        // Fallback: rewrite localhost in the original URL
+        var fallback = rewriteLocalhost(url);
+        console.warn("[Stalker] Falling back to:", fallback);
+        return fallback;
     }
 }
 
