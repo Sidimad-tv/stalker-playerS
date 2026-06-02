@@ -156,14 +156,48 @@ class StalkerClient {
     }
 
     async getChannels(genreId = null) {
-        const params = {
-            type: 'itv',
-            force_ch_link_check: 0,
-            sortby: 'number',
-        };
-        if (genreId && genreId !== 'all') {
-            params.genre = genreId;
+        const all = [];
+        let page = 1;
+        let hasMore = true;
+
+        while (hasMore) {
+            const params = {
+                type: 'itv',
+                force_ch_link_check: 0,
+                sortby: 'number',
+                p: page,
+            };
+            if (genreId && genreId !== 'all') {
+                params.genre = genreId;
+            }
+
+            const data = await this._request('get_ordered_list', params);
+            console.log('[Stalker] get_ordered_list page', page, ':', data);
+
+            if (data && data.js) {
+                const list = Array.isArray(data.js) ? data.js : (data.js.data || []);
+                list.forEach(function(ch) { all.push(ch); });
+
+                const total = Number(data.total_items) || 0;
+                const max = Number(data.max_page_items) || list.length;
+                const totalPages = max > 0 ? Math.ceil(total / max) : 1;
+                hasMore = page < totalPages && list.length > 0;
+                page++;
+                if (page > 20) hasMore = false;
+            } else {
+                hasMore = false;
+            }
         }
+
+        return all.map(function(ch) { return {
+            id: ch.id,
+            number: ch.number,
+            name: ch.name,
+            url: ch.cmd,
+            logo: ch.logo || ch.logo_src || ch.tv_logo || null,
+            genre_id: ch.tv_genre_id
+        };});
+    }
 
         const data = await this._request('get_ordered_list', params);
 
@@ -216,15 +250,49 @@ class StalkerClient {
     }
 
     async getVodList(categoryId, type) {
-        const params = {
-            'type': type || 'vod',
-            'action': 'get_ordered_list',
-            'p': 1 // simple pagination, page 1
-        };
+        const all = [];
+        let page = 1;
+        let hasMore = true;
 
-        if (categoryId && categoryId !== 'all') {
-            params.category = categoryId;
+        while (hasMore) {
+            const params = {
+                'type': type || 'vod',
+                'p': page,
+            };
+
+            if (categoryId && categoryId !== 'all') {
+                params.category = categoryId;
+            }
+
+            const data = await this._request('get_ordered_list', params);
+            console.log('[Stalker] get_ordered_list ' + type + ' page', page, ':', data);
+
+            if (data && data.js) {
+                const list = Array.isArray(data.js) ? data.js : (data.js.data || []);
+                list.forEach(function(m) { all.push(m); });
+
+                const total = Number(data.total_items) || 0;
+                const max = Number(data.max_page_items) || list.length;
+                const totalPages = max > 0 ? Math.ceil(total / max) : 1;
+                hasMore = page < totalPages && list.length > 0;
+                page++;
+                if (page > 20) hasMore = false;
+            } else {
+                hasMore = false;
+            }
         }
+
+        return all.map(m => ({
+            id: m.id,
+            name: m.name,
+            url: m.cmd,
+            logo: m.screenshot_uri || m.logo,
+            description: m.description,
+            year: m.year,
+            genres: m.genres_str,
+            rating: m.rating_imdb || m.rating_kinopoisk
+        }));
+    }
 
         const data = await this._request('get_ordered_list', params);
 
