@@ -309,7 +309,14 @@ async function streamHandler(event, context) {
   }
 
   if (path === '/api/status') return Promise.resolve(jsonResponse(200, { ok: true, ffmpeg: !!getFfmpeg(), node: process.version }));
-  if (path === '/api/debug-path') return Promise.resolve(jsonResponse(200, { path: path, rawPath: event.path, method: method, qs: event.queryStringParameters }));
+
+  if (path === '/api/stalker/stream-get' && method === 'GET') {
+    var sg = event.queryStringParameters || {};
+    if (!sg.url) return Promise.resolve(jsonResponse(400, { error: 'Missing url' }));
+    return proxyStreamPromise(sg.url, 'GET', sg.token || '', sg.portal || '', sg.mac || '', sg.cmd || '', sg.transcode === 'true' || sg.transcode === '1').then(function(r) {
+      return { statusCode: r.statusCode, headers: { 'Content-Type': r.contentType, 'Access-Control-Allow-Origin': '*' }, body: r.body, isBase64Encoded: r.isBase64Encoded || false };
+    });
+  }
 
   if (path === '/proxy/stream' && method === 'GET') {
     var proxyQ = event.queryStringParameters || {};
@@ -460,7 +467,7 @@ async function streamHandler(event, context) {
     return Promise.resolve(jsonResponse(404, { error: 'Unknown action: ' + action }));
   }
 
-  return Promise.resolve(jsonResponse(404, { error: 'Not found', path: path, rawPath: event.path, method: method }));
+  return Promise.resolve(jsonResponse(404, { error: 'Not found' }));
 }
 
 function proxyStreamPromise(url, method, token, portalForRefresh, macForRefresh, cmdForRefresh, transcode) {

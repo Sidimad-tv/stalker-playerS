@@ -427,7 +427,7 @@ function loadStream(url, contentType, originalCmd) {
     var originalUrl = url;
     var isCrossOrigin = url.indexOf(location.protocol + '//' + location.host) !== 0 && url.indexOf('//' + location.host) === -1;
     if (isCrossOrigin) {
-        url = '/proxy/stream?url=' + encodeURIComponent(url) + '&token=' + encodeURIComponent(portalToken || '') + '&portal=' + encodeURIComponent(portalBase || '') + '&mac=' + encodeURIComponent(state.mac || '') + '&cmd=' + encodeURIComponent(originalCmd || '');
+        url = '/api/stalker/stream-get?url=' + encodeURIComponent(url) + '&token=' + encodeURIComponent(portalToken || '') + '&portal=' + encodeURIComponent(portalBase || '') + '&mac=' + encodeURIComponent(state.mac || '') + '&cmd=' + encodeURIComponent(originalCmd || '');
     }
 
     var format = detectStreamFormat(originalUrl, contentType);

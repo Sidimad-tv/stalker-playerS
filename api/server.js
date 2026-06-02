@@ -407,6 +407,13 @@ module.exports = async function(req, res) {
     return;
   }
 
+  if (reqPath === '/api/stalker/stream-get' && method === 'GET') {
+    var sg = require('url').parse(req.url, true).query;
+    if (!sg.url) return sendJson(res, 400, { error: 'Missing url' });
+    proxyStream(res, sg.url, 'GET', sg.token || '', sg.portal || '', sg.mac || '', sg.cmd || '', sg.transcode === 'true' || sg.transcode === '1');
+    return;
+  }
+
   if (reqPath.indexOf('/api/stalker/') === 0) {
     var action = reqPath.replace('/api/stalker/', '');
     if (method !== 'POST') return sendJson(res, 405, { error: 'Method not allowed' });

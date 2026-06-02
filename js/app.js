@@ -446,7 +446,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function getProxiedUrl(url) {
         // Route through local server proxy to bypass CORS
         if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-            return '/proxy/stream?url=' + encodeURIComponent(url);
+            return '/api/stalker/stream-get?url=' + encodeURIComponent(url);
         }
         return url;
     }
