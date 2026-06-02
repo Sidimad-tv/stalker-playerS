@@ -444,15 +444,17 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function getProxiedUrl(url) {
-        // Route through local server proxy to bypass CORS
-        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-            return '/api/stalker/stream-get?url=' + encodeURIComponent(url);
-        }
-        return url;
+        var isCrossOrigin = url.indexOf(location.protocol + '//' + location.host) !== 0 && url.indexOf('//' + location.host) === -1;
+        if (!isCrossOrigin) return url;
+        var sgBase = window.location.hostname.indexOf('vercel') !== -1 ? '/api/stalker/stream-get' : 'https://stalker-p.vercel.app/api/stalker/stream-get';
+        var token = (stalkerClient && stalkerClient.token) || '';
+        return sgBase + '?url=' + encodeURIComponent(url) + (token ? '&token=' + encodeURIComponent(token) : '');
     }
 
+    var isFirefox = /Firefox/i.test(navigator.userAgent);
+
     function isMpegTs(url) {
-        return url.includes('.ts') || url.includes('extension=ts');
+        return url.indexOf('.ts') !== -1 || url.indexOf('extension=ts') !== -1;
     }
 
     async function playPreview(url) {
@@ -476,8 +478,8 @@ document.addEventListener('DOMContentLoaded', () => {
             // Ensure sound is on
             ui.previewPlayer.muted = false;
 
-            // Robust check for mpegts support
-            const isMpegtsAvailable = typeof mpegts !== 'undefined' &&
+            // Robust check for mpegts support (skip on Firefox, CORS preflight is slow)
+            var isMpegtsAvailable = !isFirefox && typeof mpegts !== 'undefined' &&
                 (typeof mpegts.isSupported === 'function' ? mpegts.isSupported() : mpegts.isSupported);
 
             if (isMpegTs(cleanUrl) && isMpegtsAvailable) {
@@ -490,6 +492,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 previewMpegts.attachMediaElement(ui.previewPlayer);
                 previewMpegts.load();
                 previewMpegts.play().catch(e => console.log('Preview autoplay blocked'));
+            } else if (isMpegTs(cleanUrl)) {
+                console.log("TS preview, using native video");
+                ui.previewPlayer.src = proxiedUrl;
+                ui.previewPlayer.play().catch(e => console.log('Preview autoplay blocked'));
             } else if (Hls.isSupported()) {
                 previewHls = new Hls({
                     debug: false,
@@ -590,7 +596,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // Detect Format
-        if (isMpegTs(url) && typeof mpegts !== 'undefined' && mpegts.isSupported()) {
+        if (isMpegTs(url) && typeof mpegts !== 'undefined' && mpegts.isSupported() && !isFirefox) {
             console.log("Using mpegts.js for fullscreen");
             mpegtsPlayer = mpegts.createPlayer({
                 type: 'mpegts',
@@ -611,6 +617,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             });
 
+        } else if (isMpegTs(url)) {
+            // TS stream on Firefox or mpegts unavailable — use native video
+            console.log("TS stream, using native video");
+            video.src = proxiedUrl;
+            video.play().catch(function (e) {
+                console.error('Native TS playback failed:', e);
+                showStatus("Stream URL: " + url + " (Copy to VLC)", "info");
+            });
         } else if (Hls.isSupported()) {
             hlsInstance = new Hls({
                 debug: false,
