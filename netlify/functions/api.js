@@ -309,6 +309,7 @@ async function streamHandler(event, context) {
   }
 
   if (path === '/api/status') return Promise.resolve(jsonResponse(200, { ok: true, ffmpeg: !!getFfmpeg(), node: process.version }));
+  if (path === '/api/debug-path') return Promise.resolve(jsonResponse(200, { path: path, rawPath: event.path, method: method, qs: event.queryStringParameters }));
 
   if (path === '/proxy/stream' && method === 'GET') {
     var proxyQ = event.queryStringParameters || {};
