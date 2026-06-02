@@ -1,0 +1,9 @@
+node_modules/
+backup-*/
+*.log
+.env
+.DS_Store
+node_modules/@ffmpeg-installer/win32-*/
+node_modules/@ffmpeg-installer/linux-*/
+node_modules/@ffmpeg-installer/darwin-*/
+node_modules/@ffmpeg-installer/ffmpeg/.env

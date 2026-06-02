@@ -4,18 +4,17 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const spawn = require('child_process').spawn;
-const ffmpeg = require('fluent-ffmpeg');
 
 var ffmpegPath = null;
+
+// Try @ffmpeg-installer first
 try {
   const ffmpegInstaller = require('@ffmpeg-installer/ffmpeg');
   ffmpegPath = ffmpegInstaller.path;
+  console.log('[ffmpeg] using @ffmpeg-installer');
 } catch(e) {
   console.log('[ffmpeg] @ffmpeg-installer not available, trying system paths');
-}
-
-// System FFmpeg detection
-if (!ffmpegPath) {
+  // System FFmpeg detection
   try {
     const { execSync } = require('child_process');
     ffmpegPath = execSync('which ffmpeg').toString().trim();
@@ -40,13 +39,7 @@ if (!ffmpegPath) {
   }
 }
 
-// Set FFmpeg path if found
-if (ffmpegPath) {
-  ffmpeg.setFfmpegPath(ffmpegPath);
-  console.log('[ffmpeg] path=%s', ffmpegPath);
-} else {
-  console.log('[ffmpeg] NOT AVAILABLE - transcoding will be disabled');
-}
+if (ffmpegPath) console.log('[ffmpeg] path=%s', ffmpegPath); else console.log('[ffmpeg] NOT AVAILABLE - transcoding disabled, using direct proxy only');
 
 process.on('uncaughtException', function(e) { console.error('Uncaught:', e.message); });
 process.on('unhandledRejection', function(e) { console.error('Unhandled:', e.message); });
@@ -189,7 +182,7 @@ function resolvePortalPath(baseUrl, mac, userPath) {
 
 // ══════════════════════════════════════════════════════════════════════
 // Stalker API handlers
-// ══════════════════════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════════════════
 
 function readJsonBody(req) {
   return new Promise(function(resolve, reject) {
@@ -298,9 +291,9 @@ function proxyStream(res, url, method, token, portal, mac, cmd, transcode) {
   };
   if (token) headers['Authorization'] = 'Bearer ' + token;
   if (mac) headers['Cookie'] = 'mac=' + mac;
-  
+
   if (transcode && ffmpegPath) {
-    // FFmpeg transcoding
+    // FFmpeg transcoding (direct spawn approach)
     var ffmpeg = spawn(ffmpegPath, [
       '-i', url,
       '-c:v', 'libx264', '-preset', 'fast', '-crf', '28',
@@ -319,8 +312,10 @@ function proxyStream(res, url, method, token, portal, mac, cmd, transcode) {
     });
     ffmpeg.on('error', function(err) {
       console.error('[ffmpeg] error:', err.message);
-      res.writeHead(500);
-      res.end('FFmpeg error: ' + err.message);
+      if (!res.headersSent) {
+        res.writeHead(500);
+        res.end('FFmpeg error: ' + err.message);
+      }
     });
   } else {
     // Direct proxy
