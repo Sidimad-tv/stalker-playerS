@@ -451,8 +451,6 @@ document.addEventListener('DOMContentLoaded', () => {
         return sgBase + '?url=' + encodeURIComponent(url) + (token ? '&token=' + encodeURIComponent(token) : '');
     }
 
-    var isFirefox = /Firefox/i.test(navigator.userAgent);
-
     function isMpegTs(url) {
         return url.indexOf('.ts') !== -1 || url.indexOf('extension=ts') !== -1;
     }
@@ -479,8 +477,8 @@ document.addEventListener('DOMContentLoaded', () => {
             ui.previewPlayer.muted = false;
             ui.previewPlayer.crossOrigin = 'anonymous';
 
-            // Robust check for mpegts support (skip on Firefox, CORS preflight is slow)
-            var isMpegtsAvailable = !isFirefox && typeof mpegts !== 'undefined' &&
+            // Check for mpegts.js support
+            var isMpegtsAvailable = typeof mpegts !== 'undefined' &&
                 (typeof mpegts.isSupported === 'function' ? mpegts.isSupported() : mpegts.isSupported);
 
             if (isMpegTs(cleanUrl) && isMpegtsAvailable) {
@@ -601,7 +599,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // Detect Format
-        if (isMpegTs(url) && typeof mpegts !== 'undefined' && mpegts.isSupported() && !isFirefox) {
+        if (isMpegTs(url) && typeof mpegts !== 'undefined' && mpegts.isSupported()) {
             console.log("Using mpegts.js for fullscreen");
             mpegtsPlayer = mpegts.createPlayer({
                 type: 'mpegts',
