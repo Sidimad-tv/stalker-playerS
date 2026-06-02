@@ -2,7 +2,7 @@ var http = require('http');
 var https = require('https');
 var crypto = require('crypto');
 var spawn = require('child_process').spawn;
-var { stream } = require('@netlify/functions');
+
 
 var ffmpegPath = null;
 function getFfmpeg() {
@@ -311,45 +311,31 @@ async function streamHandler(event, context) {
 
   if (path === '/api/status') return Promise.resolve(jsonResponse(200, { ok: true, ffmpeg: !!getFfmpeg(), node: process.version }));
 
-  // Stream proxy endpoints: use fetch() to proxy, return ReadableStream for streaming
-  async function proxyStreamResponse(streamUrl, streamToken, portalForRefresh, macForRefresh, cmdForRefresh) {
-    var fetchUrl = streamUrl;
-    var maxRedirects = 10;
-    for (var i = 0; i < maxRedirects; i++) {
-      var resp = await fetch(fetchUrl, {
-        headers: { 'User-Agent': 'Mozilla/5.0 (QtEmbedded; U; Linux; C) AppleWebKit/533.3' }
-      });
-      if (resp.status === 302 || resp.status === 301) {
-        fetchUrl = resp.headers.get('location') || '';
-        if (!fetchUrl) break;
-        continue;
-      }
-      // Token expired - refresh and retry
-      if ((resp.status === 462 || resp.status === 403) && portalForRefresh && macForRefresh && cmdForRefresh) {
-        var refreshBody = JSON.stringify({ cmd: cmdForRefresh, portal: portalForRefresh, mac: macForRefresh, token: streamToken });
-        var refreshResp = await fetch(portalForRefresh.replace(/\/+$/, '') + '/stalker_portal/api/v2/stb/link/create_link', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: refreshBody
-        });
-        var refreshData = {};
-        try { refreshData = await refreshResp.json(); } catch(e) {}
-        var newCmd = (refreshData.js && refreshData.js.cmd) || '';
-        if (newCmd) { fetchUrl = newCmd; continue; }
-      }
-      var contentType = resp.headers.get('content-type') || 'video/mp2t';
-      return { statusCode: resp.status, headers: { 'Content-Type': contentType, 'Access-Control-Allow-Origin': '*' }, body: resp.body };
+  // Netlify can't stream. Redirect stream-get to Vercel (omit portal/mac to avoid routing issues).
+  // stream-proxy is handled client-side (frontend POSTs to Vercel directly - CORS is fine).
+  if ((path === '/api/stalker/stream-get' || path === '/proxy/stream') && method === 'GET') {
+    var sg = event.queryStringParameters || {};
+    if (!sg.url) return Promise.resolve(jsonResponse(400, { error: 'Missing url' }));
+    var params = 'url=' + encodeURIComponent(sg.url);
+    if (sg.token) params += '&token=' + encodeURIComponent(sg.token);
+    if (sg.cmd) params += '&cmd=' + encodeURIComponent(sg.cmd);
+    return Promise.resolve({ statusCode: 302, headers: { Location: 'https://stalker-p.vercel.app/api/stalker/stream-get?' + params, 'Access-Control-Allow-Origin': '*' }, body: '' });
+  }
+      return { statusCode: proxyResp.status, headers: { 'Content-Type': contentType, 'Access-Control-Allow-Origin': '*' }, body: proxyResp.body };
+    } catch(e) {
+      return jsonResponse(502, { error: 'Vercel proxy error: ' + e.message });
     }
-    return { statusCode: 502, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ error: 'proxy failed' }) };
   }
 
   if ((path === '/api/stalker/stream-get' || path === '/proxy/stream') && method === 'GET') {
     var sg = event.queryStringParameters || {};
     if (!sg.url) return Promise.resolve(jsonResponse(400, { error: 'Missing url' }));
-    return proxyStreamResponse(sg.url, sg.token || '', sg.portal || '', sg.mac || '', sg.cmd || '');
+    return proxyViaVercel(sg, 'GET', null);
   }
 
   if (path === '/api/stalker/stream-proxy' && method === 'POST') {
     if (!body.url) return Promise.resolve(jsonResponse(400, { error: 'url required' }));
-    return proxyStreamResponse(body.url, body.token || '', '', '', '');
+    return proxyViaVercel(null, 'POST', body);
   }
 
   if (path === '/fetch' && method === 'GET') {
@@ -540,4 +526,4 @@ function proxyStreamPromise(url, method, token, portalForRefresh, macForRefresh,
   return doFetch(url, 0);
 }
 
-exports.handler = stream(streamHandler);
+exports.handler = streamHandler;

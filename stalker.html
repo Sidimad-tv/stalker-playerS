@@ -427,7 +427,8 @@ function loadStream(url, contentType, originalCmd) {
     var originalUrl = url;
     var isCrossOrigin = url.indexOf(location.protocol + '//' + location.host) !== 0 && url.indexOf('//' + location.host) === -1;
     if (isCrossOrigin) {
-        url = '/api/stalker/stream-get?url=' + encodeURIComponent(url) + '&token=' + encodeURIComponent(portalToken || '') + '&portal=' + encodeURIComponent(portalBase || '') + '&mac=' + encodeURIComponent(state.mac || '') + '&cmd=' + encodeURIComponent(originalCmd || '');
+        var sgBase = window.location.hostname.indexOf('vercel') !== -1 ? '/api/stalker/stream-get' : 'https://stalker-p.vercel.app/api/stalker/stream-get';
+        url = sgBase + '?url=' + encodeURIComponent(url) + '&token=' + encodeURIComponent(portalToken || '');
     }
 
     var format = detectStreamFormat(originalUrl, contentType);
@@ -685,7 +686,8 @@ function loadStreamMse(video, url) {
             if (result.done) { try { mseMediaSource.endOfStream(); } catch(e) {} return; }
             if (mseSourceBuffer && !mseSourceBuffer.updating) mseSourceBuffer.appendBuffer(result.value);
         }
-        fetch('/api/stalker/stream-proxy', {
+        var spBase = window.location.hostname.indexOf('vercel') !== -1 ? '' : 'https://stalker-p.vercel.app';
+        fetch(spBase + '/api/stalker/stream-proxy', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ url: url, token: portalToken || '' }), signal: mseAborter.signal,
         }).then(function(res) {
