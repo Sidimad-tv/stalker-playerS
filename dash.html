@@ -331,6 +331,11 @@ window.onerror = function(msg, src, line, col, err) {
   function isTS(u) { return /\.ts\b|extension=ts|\.m2ts/i.test(u); }
   function isM3U(u) { return /\.m3u8/i.test(u); }
 
+  function proxyStreamUrl(url) {
+    if (!url || url.indexOf('http:') !== 0 || location.protocol !== 'https:') return url;
+    return location.origin + '/api/stalker/stream-get?url=' + encodeURIComponent(url);
+  }
+
   // ── Login tabs ──
   function setTab(t) {
     qa('[data-tab]').forEach(function(b) { b.classList.toggle('active', b.getAttribute('data-tab') === t); });
@@ -670,25 +675,25 @@ window.onerror = function(msg, src, line, col, err) {
     if (S.client && S.client.createLink) {
       try { url = await S.client.createLink(cmd); } catch(e) { url = cmd; }
     }
+    var pUrl = proxyStreamUrl(url);
+    if (S.xtream.mode) pUrl = proxyStreamUrl(cmd);
 
     var hOk = typeof Hls !== 'undefined' && Hls.isSupported();
     var mOk = typeof mpegts !== 'undefined' && mpegts.isSupported && mpegts.isSupported();
 
     try {
       if (isTS(cmd) && mOk) {
-        var pUrl = url;
-        if (S.xtream.mode) pUrl = cmd;
         S.pvMpegts = mpegts.createPlayer({ type: 'mpegts', isLive: true, url: pUrl });
         S.pvMpegts.attachMediaElement(ui.pvVideo);
         S.pvMpegts.load();
         S.pvMpegts.on(mpegts.Events.ERROR, function() { destroyPv(); });
       } else if (isM3U(cmd) && hOk) {
         S.pvHls = new Hls({ debug: false });
-        S.pvHls.loadSource(url);
+        S.pvHls.loadSource(pUrl);
         S.pvHls.attachMedia(ui.pvVideo);
         S.pvHls.on(Hls.Events.MANIFEST_PARSED, function() { ui.pvVideo.play().catch(function() {}); });
       } else {
-        ui.pvVideo.src = url;
+        ui.pvVideo.src = pUrl;
         ui.pvVideo.play().catch(function() {});
       }
       ui.pvFs.classList.remove('hidden');
@@ -747,6 +752,8 @@ window.onerror = function(msg, src, line, col, err) {
     if (S.client && S.client.createLink) {
       try { url = await S.client.createLink(cmd); } catch(e) { url = cmd; }
     }
+    var pUrl = proxyStreamUrl(url);
+    if (S.xtream.mode) pUrl = proxyStreamUrl(cmd);
 
     var showVlc = function(raw) {
       ui.plVlc.style.display = '';
@@ -762,8 +769,6 @@ window.onerror = function(msg, src, line, col, err) {
 
     function tryMpegts() {
       if (!isTS(cmd) || typeof mpegts === 'undefined' || !mpegts.isSupported || !mpegts.isSupported()) { tryHls(); return; }
-      var pUrl = url;
-      if (S.xtream.mode) pUrl = cmd;
       S.plMpegts = mpegts.createPlayer({ type: 'mpegts', isLive: true, url: pUrl });
       S.plMpegts.attachMediaElement(ui.plVideo);
       S.plMpegts.load();
@@ -790,7 +795,7 @@ window.onerror = function(msg, src, line, col, err) {
     }
 
     function tryNative() {
-      ui.plVideo.src = url;
+      ui.plVideo.src = pUrl;
       ui.plVideo.play().catch(function(e) {
         showPlErr('Playback failed', url);
       });
