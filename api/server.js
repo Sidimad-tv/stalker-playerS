@@ -378,15 +378,17 @@ module.exports = async function(req, res) {
     return res.end();
   }
 
-  try {
-    var body = await new Promise(function(resolve, reject) {
-      var chunks = [];
-      req.on('data', function(c) { chunks.push(c); });
-      req.on('end', function() { resolve(Buffer.concat(chunks).toString()); });
-      req.on('error', reject);
-    });
-  } catch(e) { body = ''; }
-  try { body = JSON.parse(body || '{}'); } catch(e) { body = {}; }
+  var bodyStr = '';
+  try { bodyStr = await new Promise(function(resolve, reject) {
+    var chunks = [];
+    req.on('data', function(c) { chunks.push(c); });
+    req.on('end', function() { resolve(Buffer.concat(chunks).toString()); });
+    req.on('error', reject);
+    req.resume();
+  }); } catch(e) { bodyStr = ''; }
+  if (reqPath === '/api/debug-body') return sendJson(res, 200, { raw: bodyStr, method: method, path: reqPath });
+  var body = {};
+  try { body = JSON.parse(bodyStr || '{}'); } catch(e) { body = {}; }
 
   if (reqPath === '/api/status') return sendJson(res, 200, { ok: true, ffmpeg: !!getFfmpeg(), node: process.version });
 
