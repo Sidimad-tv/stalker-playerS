@@ -486,6 +486,16 @@ button:focus {
 /* Player Screen - Fullscreen */
 #player-screen {
     background: black;
+    justify-content: flex-start;
+    align-items: stretch;
+    padding: 0;
+}
+
+#player-screen #video-player {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    background: #000;
 }
 
 /* TV-Style Info Banner */
