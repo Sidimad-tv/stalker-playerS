@@ -28,39 +28,56 @@ class StalkerClient {
     }
 
     _normalizeUrl(url) {
-        let normalized = url.replace(/\/+$/, "");
+        return url.replace(/\/+$/, "");
+    }
 
-        // If it already ends in a php file, return as-is
-        if (normalized.match(/\/[^/]+\.php$/)) {
-            return normalized;
-        }
+    async _resolveBase(rawUrl) {
+        const normalized = rawUrl.replace(/\/+$/, "");
+        if (normalized.match(/\/[^/]+\.php$/)) return normalized;
 
         const urlObj = new URL(normalized);
-        const origin = urlObj.origin; // e.g. http://tkosportz.live:25461
+        const origin = urlObj.origin;
+        const path = urlObj.pathname.replace(/\/+$/, "");
 
-        // Build candidates: prefer root-level first, then path-based
-        const candidates = [
-            // Root-level (portal may use /c as a prefix but API is at root)
-            origin + "/server/load.php",
-            origin + "/stalker_portal/server/load.php",
-            origin + "/portal.php",
-            // Path-based (when URL has a path like /c or /stalker_portal/c)
-            normalized + "/portal.php",
-            normalized + "/server/load.php",
-            normalized + "/load.php",
-            normalized + "/c/portal.php",
-            normalized + "/stalker_portal/c/portal.php",
-        ];
+        let candidates = [];
+        if (path && path !== "/") {
+            candidates.push(origin + path + "/server/load.php");
+            candidates.push(origin + path + "/portal.php");
+            candidates.push(origin + path + "/load.php");
+            candidates.push(origin + path + "/c/portal.php");
+        }
+        candidates.push(origin + "/server/load.php");
+        candidates.push(origin + "/portal.php");
+        candidates.push(origin + "/stalker_portal/server/load.php");
+        candidates.push(origin + "/c/portal.php");
 
-        // Remove duplicates
         const seen = new Set();
-        const unique = [];
+        const uniq = [];
         for (const c of candidates) {
-            if (!seen.has(c)) { seen.add(c); unique.push(c); }
+            if (!seen.has(c)) { seen.add(c); uniq.push(c); }
         }
 
-        // Return first candidate (backend will auto-detect)
-        return unique[0];
+        var hostname = window.location.hostname;
+        var isLocal = hostname === 'localhost' || hostname === '127.0.0.1';
+
+        for (const c of uniq) {
+            try {
+                var testUrl = c + "?type=stb&prehash=0&action=handshake";
+                var resp;
+                if (isLocal) {
+                    resp = await fetch(testUrl, { method: 'GET', signal: AbortSignal.timeout(5000) });
+                } else {
+                    resp = await fetch('/api/stalker/proxy?url=' + encodeURIComponent(testUrl) + '&mac=' + encodeURIComponent(this.mac), { signal: AbortSignal.timeout(8000) });
+                }
+                if (!resp.ok) continue;
+                var text = await resp.text();
+                var data = JSON.parse(text);
+                var token = (data.js && data.js.token) || data.token;
+                if (token) { console.log('[Stalker] Base resolved:', c); return c; }
+            } catch(e) {}
+        }
+
+        return normalized + "/server/load.php";
     }
 
     async _request(action, extraParams = {}) {
@@ -124,6 +141,10 @@ class StalkerClient {
 
     async authenticate(username, password) {
         try {
+            // Step 0: Resolve portal API base URL (try multiple paths)
+            this.portalUrl = await this._resolveBase(this.portalUrl);
+            console.log("[Stalker] Portal URL:", this.portalUrl);
+
             // Step 1: Handshake to get token
             console.log("[Stalker] Starting handshake...");
             const handshake = await this._request('handshake', {
