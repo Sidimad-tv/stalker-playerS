@@ -319,7 +319,7 @@ async function streamHandler(event, context) {
     var params = 'url=' + encodeURIComponent(sg.url);
     if (sg.token) params += '&token=' + encodeURIComponent(sg.token);
     if (sg.cmd) params += '&cmd=' + encodeURIComponent(sg.cmd);
-    return Promise.resolve({ statusCode: 302, headers: { Location: 'https://stalker-p.vercel.app/api/stalker/stream-get?' + params, 'Access-Control-Allow-Origin': '*' }, body: '' });
+    return Promise.resolve({ statusCode: 302, headers: { Location: 'https://stalker-p.vercel.app/stm/stream-get?' + params, 'Access-Control-Allow-Origin': '*' }, body: '' });
   }
 
   // stream-proxy is handled client-side (frontend POSTs to Vercel directly)

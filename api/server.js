@@ -407,10 +407,10 @@ module.exports = async function(req, res) {
     return;
   }
 
-  if (reqPath === '/api/stalker/stream-get' && method === 'GET') {
+  if ((reqPath === '/api/stalker/stream-get' || reqPath === '/stm/stream-get') && method === 'GET') {
     var sg = require('url').parse(req.url, true).query;
     if (!sg.url) return sendJson(res, 400, { error: 'Missing url' });
-    proxyStream(res, sg.url, 'GET', sg.token || '', sg.portal || '', sg.mac || '', sg.cmd || '', sg.transcode === 'true' || sg.transcode === '1');
+    proxyStream(res, sg.url, 'GET', sg.token || '', sg.portal || sg._portal || '', sg.mac || sg._mac || '', sg.cmd || '', sg.transcode === 'true' || sg.transcode === '1');
     return;
   }
 
