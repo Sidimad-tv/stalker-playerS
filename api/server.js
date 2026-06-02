@@ -423,7 +423,9 @@ module.exports = async function(req, res) {
       hostname: pu.hostname, port: pu.port || (pu.protocol === 'https:' ? 443 : 80),
       path: pu.pathname + pu.search, method: 'GET',
       headers: {
-        'User-Agent': 'Mozilla/5.0', 'Accept': '*/*',
+        'User-Agent': 'Mozilla/5.0 (QtEmbedded; U; Linux; C) AppleWebKit/533.3 (KHTML, like Gecko) MAG200 stbapp ver: 2 rev: 250 Safari/533.3',
+        'X-User-Agent': 'Model: MAG200; Link: Ethernet',
+        'Accept': '*/*',
         'Cookie': pq.mac ? 'mac=' + pq.mac + '; stb_lang=en; timezone=Europe/London' : '',
       },
       rejectUnauthorized: false, timeout: 15000,
