@@ -245,6 +245,12 @@ input, button { font: inherit; }
 // Dashboard – Stellar
 // ═══════════════════════════════════════════════════════════════
 
+// Global error logger
+window.onerror = function(msg, src, line, col, err) {
+    console.error('GLOBAL ERROR:', msg, src, line, col, err);
+    var el = document.getElementById('status-msg');
+    if (el) el.textContent = '⚠ Error: ' + (err ? err.message : msg);
+};
 document.addEventListener('DOMContentLoaded', function() {
     var $ = function(id) { return document.getElementById(id); };
     var q = function(s, p) { return (p || document).querySelector(s); };
@@ -317,15 +323,18 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // ── Saved portals ──
     function getPortals() { try { return JSON.parse(localStorage.getItem('st_ports') || '[]'); } catch(e) { return []; } }
-    function savePortal(p) {
-        var list = getPortals();
-        for (var i = 0; i < list.length; i++) {
-            if (list[i].type === p.type && list[i].url === p.url && ((p.type==='stalker' && list[i].mac===p.mac) || (p.type==='xtream' && list[i].user===p.user))) {
-                list[i] = p; renderSaved(); return;
-            }
+function savePortal(p) {
+    var list = getPortals();
+    var found = false;
+    for (var i = 0; i < list.length; i++) {
+        if (list[i].type === p.type && list[i].url === p.url && ((p.type==='stalker' && list[i].mac===p.mac) || (p.type==='xtream' && list[i].user===p.user))) {
+            list[i] = p; found = true; break;
         }
-        list.push(p); renderSaved(); localStorage.setItem('st_ports', JSON.stringify(list));
     }
+    if (!found) list.push(p);
+    localStorage.setItem('st_ports', JSON.stringify(list));
+    renderSaved();
+}
     function delPortal(i) { var list = getPortals(); list.splice(i,1); localStorage.setItem('st_ports', JSON.stringify(list)); renderSaved(); }
 
     function renderSaved() {
@@ -334,17 +343,21 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!list.length) return;
         var label = document.createElement('div');
         label.className = 'sl-label'; label.textContent = 'Saved portals';
-        ui.savedList.appendChild(label);
-        list.forEach(function(p, idx) {
-            var item = document.createElement('div');
-            item.className = 'sl-item';
-            var icon = p.type === 'stalker' ? '🔑' : '🌐';
-            var label2 = (p.type === 'stalker' ? p.url.replace(/https?:\/\//,'').substring(0,25) : (p.user || '') + '@' + (p.url ? p.url.replace(/https?:\/\//,'').substring(0,15) : ''));
-            item.innerHTML = '<span>' + icon + '</span><span style="flex:1;font-size:13px;">' + escapeHtml(label2) + '</span><span class="sl-del" data-idx="' + idx + '">✕</span>';
-            item.querySelector('.sl-del').addEventListener('click', function(e) { e.stopPropagation(); delPortal(idx); });
-            item.addEventListener('click', function() { connectSaved(p); });
-            ui.savedList.appendChild(item);
-        });
+    ui.savedList.appendChild(label);
+    list.forEach(function(p, idx) {
+        var item = document.createElement('div');
+        item.className = 'sl-item';
+        var icon = p.type === 'stalker' ? '🔑' : '🌐';
+        var label2 = (p.type === 'stalker' ? p.url.replace(/https?:\/\//,'').substring(0,30) : (p.user || '') + '@' + (p.url ? p.url.replace(/https?:\/\//,'').substring(0,20) : ''));
+        var del = document.createElement('span');
+        del.className = 'sl-del';
+        del.textContent = '✕';
+        del.addEventListener('click', function(e) { e.stopPropagation(); delPortal(idx); });
+        item.innerHTML = '<span>' + icon + '</span><span style="flex:1;font-size:13px;">' + escapeHtml(label2) + '</span>';
+        item.appendChild(del);
+        item.addEventListener('click', function() { connectSaved(p); });
+        ui.savedList.appendChild(item);
+    });
     }
 
     function connectSaved(p) {
@@ -357,43 +370,57 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // ── Login tabs ──
+    function setLoginTab(t) {
+        console.log('[Login] set tab:', t);
+        ui.lgStalker.classList.toggle('hidden', t !== 'stalker');
+        ui.lgXtream.classList.toggle('hidden', t !== 'xtream');
+        qa('input', ui.lgStalker).forEach(function(inp) { inp.disabled = t !== 'stalker'; });
+        qa('input', ui.lgXtream).forEach(function(inp) { inp.disabled = t !== 'xtream'; });
+    }
+    // Init default tab
+    setLoginTab('stalker');
     qa('[data-lgtab]').forEach(function(btn) {
         btn.addEventListener('click', function() {
             qa('[data-lgtab]').forEach(function(b) { b.classList.remove('active'); });
             btn.classList.add('active');
-            var t = btn.getAttribute('data-lgtab');
-        ui.lgStalker.classList.toggle('hidden', t !== 'stalker');
-        ui.lgXtream.classList.toggle('hidden', t !== 'xtream');
-        // Disable hidden inputs so browser doesn't validate them
-        qa('input', ui.lgStalker).forEach(function(inp) { inp.disabled = t !== 'stalker'; });
-        qa('input', ui.lgXtream).forEach(function(inp) { inp.disabled = t !== 'xtream'; });
+            setLoginTab(btn.getAttribute('data-lgtab'));
         });
     });
 
     // ── Connect ──
     ui.loginForm.addEventListener('submit', function(e) {
         e.preventDefault();
-        var activeTab = q('[data-lgtab].active').getAttribute('data-lgtab');
-        if (activeTab === 'stalker') {
-            var portal = ui.portalUrl.value.trim();
-            var mac = ui.macAddr.value.trim().toUpperCase().replace(/[^A-F0-9]/g,'');
-            if (mac.length === 12) mac = mac.match(/.{2}/g).join(':');
-            if (!portal || !/^([0-9A-F]{2}:){5}[0-9A-F]{2}$/.test(mac)) { setStatus('Valid Portal URL and MAC required', true); return; }
-            savePortal({ type: 'stalker', url: portal, mac: mac });
-            doConnect(portal, mac, '', '', 'stalker');
-        } else {
-            var xurl = ui.xtreamUrl.value.trim();
-            var xuser = ui.xtreamUser.value.trim();
-            var xpass = ui.xtreamPass.value.trim();
-            if (!xurl || !xuser) { setStatus('All Xtream fields required', true); return; }
-            savePortal({ type: 'xtream', url: xurl, user: xuser, pass: xpass });
-            doConnect(xurl, '', xuser, xpass, 'xtream');
+        console.log('[Login] form submitted');
+        try {
+            var activeTab = q('[data-lgtab].active').getAttribute('data-lgtab');
+            console.log('[Login] active tab:', activeTab);
+            if (activeTab === 'stalker') {
+                var portal = ui.portalUrl.value.trim();
+                var mac = ui.macAddr.value.trim().toUpperCase().replace(/[^A-F0-9]/g,'');
+                if (mac.length === 12) mac = mac.match(/.{2}/g).join(':');
+                console.log('[Login] portal:', portal, 'mac:', mac);
+                if (!portal || !/^([0-9A-F]{2}:){5}[0-9A-F]{2}$/.test(mac)) { setStatus('Valid Portal URL and MAC required', true); return; }
+                savePortal({ type: 'stalker', url: portal, mac: mac });
+                doConnect(portal, mac, '', '', 'stalker');
+            } else {
+                var xurl = ui.xtreamUrl.value.trim();
+                var xuser = ui.xtreamUser.value.trim();
+                var xpass = ui.xtreamPass.value.trim();
+                console.log('[Login] xtream url:', xurl, 'user:', xuser);
+                if (!xurl || !xuser) { setStatus('All Xtream fields required', true); return; }
+                savePortal({ type: 'xtream', url: xurl, user: xuser, pass: xpass });
+                doConnect(xurl, '', xuser, xpass, 'xtream');
+            }
+        } catch(ex) {
+            console.error('[Login] submit error:', ex);
+            setStatus('✗ ' + ex.message, true);
         }
     });
 
     function setStatus(msg, err) {
+        console.log('[Status]', msg, err ? '(error)' : '');
         ui.statusMsg.textContent = msg;
-        ui.statusMsg.style.color = err ? 'var(--red)' : 'var(--accent)';
+        ui.statusMsg.style.color = err ? '#f55' : '#00d4a0';
     }
 
     async function doConnect(portal, mac, user, pass, type) {
@@ -401,9 +428,13 @@ document.addEventListener('DOMContentLoaded', function() {
         ui.connectBtn.textContent = 'Connecting...';
         setStatus('Connecting...');
         try {
+            console.log('[Connect] type:', type, 'portal:', portal);
             if (type === 'stalker') {
                 client = new StalkerClient(portal, mac);
-                await client.authenticate(user, pass);
+                console.log('[Connect] authenticating...');
+                var authResult = await client.authenticate(user, pass);
+                console.log('[Connect] auth result:', authResult);
+                if (!client.token) throw new Error('No token after handshake');
             } else {
                 // Xtream Codes API (through proxy to avoid CORS)
                 xtream.mode = true;
@@ -413,10 +444,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Test connection via proxy
                 var testUrl = xtream.base + '/player_api.php?username=' + encodeURIComponent(user) + '&password=' + encodeURIComponent(pass);
                 var proxyPre = location.hostname.indexOf('vercel') !== -1 ? '' : 'https://stalker-p.vercel.app';
+                console.log('[Xtream] testing:', testUrl);
                 var testResp = await fetch(proxyPre + '/api/stalker/proxy?url=' + encodeURIComponent(testUrl));
+                if (!testResp.ok) throw new Error('Proxy error: ' + testResp.status);
                 var testData = await testResp.json();
-                if (!testData || testData.user_info === undefined || !testData.user_info.auth) throw new Error('Invalid Xtream credentials');
-                // Stub client for createLink - Xtream URLs are direct, no proxy needed
+                console.log('[Xtream] response:', testData);
+                if (!testData || !testData.user_info) throw new Error('Invalid Xtream credentials (no user_info)');
+                if (!testData.user_info.auth) throw new Error('Xtream auth rejected (auth=0)');
                 client = { token: 'xtream', xtreamMode: true, createLink: function(cmd) { return Promise.resolve(cmd); } };
             }
             setStatus('Connected!');
