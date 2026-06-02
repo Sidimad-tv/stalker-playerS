@@ -229,8 +229,9 @@ class StalkerClient {
 
         const data = await this._request('get_ordered_list', params);
 
-        if (data && data.js && data.js.data) {
-            return data.js.data.map(m => ({
+        if (data && data.js) {
+            var list = Array.isArray(data.js) ? data.js : (data.js.data || []);
+            return list.map(m => ({
                 id: m.id,
                 name: m.name,
                 url: m.cmd,
@@ -244,7 +245,6 @@ class StalkerClient {
 
         return [];
     }
-
 
     async createLink(cmd) {
         console.log("[Stalker] createLink called with:", cmd);
