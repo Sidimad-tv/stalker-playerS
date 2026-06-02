@@ -194,7 +194,7 @@ a{color:var(--accent);text-decoration:none}
       <div id="list" class="list"></div>
       <div class="preview">
         <div class="pv-wrap">
-          <video id="pv-video" muted playsinline></video>
+          <video id="pv-video" muted playsinline controls></video>
           <button id="pv-fs" class="pv-btn hidden">⛶ Fullscreen</button>
           <div id="pv-load" class="spinner"></div>
         </div>
@@ -637,7 +637,7 @@ window.onerror = function(msg, src, line, col, err) {
       card.addEventListener('click', function() {
         qa('.card').forEach(function(c) { c.classList.remove('sel'); });
         card.classList.add('sel');
-        openPlayer(ch);
+        selectCh(ch);
       });
       div.appendChild(card);
     });
@@ -708,7 +708,8 @@ window.onerror = function(msg, src, line, col, err) {
 
   ui.pvVideo.addEventListener('loadeddata', function() { ui.pvLoad.classList.add('hidden'); });
   ui.pvFs.addEventListener('click', function() {
-    if (S.selCh) openPlayer(S.selCh);
+    if (document.fullscreenElement) document.exitFullscreen();
+    else ui.pvVideo.requestFullscreen();
   });
 
   // ── Player ──
