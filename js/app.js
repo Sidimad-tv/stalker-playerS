@@ -477,6 +477,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Ensure sound is on
             ui.previewPlayer.muted = false;
+            ui.previewPlayer.crossOrigin = 'anonymous';
 
             // Robust check for mpegts support (skip on Firefox, CORS preflight is slow)
             var isMpegtsAvailable = !isFirefox && typeof mpegts !== 'undefined' &&
@@ -523,6 +524,10 @@ document.addEventListener('DOMContentLoaded', () => {
             previewHls.destroy();
             previewHls = null;
         }
+        if (previewMpegts) {
+            previewMpegts.destroy();
+            previewMpegts = null;
+        }
         ui.previewPlayer.pause();
         ui.previewPlayer.src = '';
 
@@ -535,8 +540,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const cleanUrl = await stalkerClient.createLink(url);
             console.log("Playing URL:", cleanUrl);
 
-            // For VOD, URL might be different? usually createLink handles it.
-
+            // Show player screen FIRST so video element is visible when setting up
+            showScreen('player');
 
             // Try webOS Luna API to launch native media player
             if (typeof webOS !== 'undefined' && webOS.service && webOS.service.request) {
@@ -567,6 +572,29 @@ document.addEventListener('DOMContentLoaded', () => {
                 playWithHtml5(cleanUrl);
             }
 
+            // ui.backBtn is removed, rely on document key handler
+            currentFocus = null;
+            showStatus("Playing...", "success");
+        } catch (e) {
+            console.error("Play error:", e);
+            showStatus("Error playing video: " + e.message, "error");
+        }
+    }
+                    },
+                    onSuccess: function (res) {
+                        console.log("Launched native player:", res);
+                    },
+                    onFailure: function (err) {
+                        console.error("Failed to launch native player:", err);
+                        // Fallback to HTML5 video -> Use Proxy
+                        playWithHtml5(cleanUrl);
+                    }
+                });
+            } else {
+                // Fallback for browser/simulator without Luna
+                playWithHtml5(cleanUrl);
+            }
+
             showScreen('player');
             // ui.backBtn is removed, rely on document key handler
             currentFocus = null;
@@ -579,6 +607,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function playWithHtml5(url) {
         const video = ui.videoPlayer;
+        video.crossOrigin = 'anonymous';
         const proxiedUrl = getProxiedUrl(url);
         console.log("HTML5 Playback URL:", proxiedUrl);
 
