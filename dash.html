@@ -688,6 +688,7 @@ window.onerror = function(msg, src, line, col, err) {
         S.pvMpegts = mpegts.createPlayer({ type: 'mpegts', isLive: true, url: pUrl });
         S.pvMpegts.attachMediaElement(ui.pvVideo);
         S.pvMpegts.load();
+        S.pvMpegts.play().catch(function() {});
         S.pvMpegts.on(mpegts.Events.ERROR, function() { destroyPv(); });
       } else if (tryM3u && hOk) {
         S.pvHls = new Hls({ debug: false });
