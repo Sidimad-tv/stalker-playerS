@@ -460,7 +460,7 @@ async function streamHandler(event, context) {
     return Promise.resolve(jsonResponse(404, { error: 'Unknown action: ' + action }));
   }
 
-  return Promise.resolve(jsonResponse(404, { error: 'Not found' }));
+  return Promise.resolve(jsonResponse(404, { error: 'Not found', path: path, rawPath: event.path, method: method }));
 }
 
 function proxyStreamPromise(url, method, token, portalForRefresh, macForRefresh, cmdForRefresh, transcode) {
