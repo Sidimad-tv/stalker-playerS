@@ -158,7 +158,6 @@ class StalkerClient {
     async getChannels(genreId = null) {
         const params = {
             type: 'itv',
-            genre: '*',
             force_ch_link_check: 0,
             sortby: 'number',
         };
