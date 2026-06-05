@@ -28,56 +28,39 @@ class StalkerClient {
     }
 
     _normalizeUrl(url) {
-        return url.replace(/\/+$/, "");
-    }
+        let normalized = url.replace(/\/+$/, "");
 
-    async _resolveBase(rawUrl) {
-        const normalized = rawUrl.replace(/\/+$/, "");
-        if (normalized.match(/\/[^/]+\.php$/)) return normalized;
+        // If it already ends in a php file, return as-is
+        if (normalized.match(/\/[^/]+\.php$/)) {
+            return normalized;
+        }
 
         const urlObj = new URL(normalized);
-        const origin = urlObj.origin;
-        const path = urlObj.pathname.replace(/\/+$/, "");
+        const origin = urlObj.origin; // e.g. http://tkosportz.live:25461
 
-        let candidates = [];
-        if (path && path !== "/") {
-            candidates.push(origin + path + "/server/load.php");
-            candidates.push(origin + path + "/portal.php");
-            candidates.push(origin + path + "/load.php");
-            candidates.push(origin + path + "/c/portal.php");
-        }
-        candidates.push(origin + "/server/load.php");
-        candidates.push(origin + "/portal.php");
-        candidates.push(origin + "/stalker_portal/server/load.php");
-        candidates.push(origin + "/c/portal.php");
+        // Build candidates: prefer root-level first, then path-based
+        const candidates = [
+            // Root-level (portal may use /c as a prefix but API is at root)
+            origin + "/server/load.php",
+            origin + "/stalker_portal/server/load.php",
+            origin + "/portal.php",
+            // Path-based (when URL has a path like /c or /stalker_portal/c)
+            normalized + "/portal.php",
+            normalized + "/server/load.php",
+            normalized + "/load.php",
+            normalized + "/c/portal.php",
+            normalized + "/stalker_portal/c/portal.php",
+        ];
 
+        // Remove duplicates
         const seen = new Set();
-        const uniq = [];
+        const unique = [];
         for (const c of candidates) {
-            if (!seen.has(c)) { seen.add(c); uniq.push(c); }
+            if (!seen.has(c)) { seen.add(c); unique.push(c); }
         }
 
-        var hostname = window.location.hostname;
-        var isLocal = hostname === 'localhost' || hostname === '127.0.0.1';
-
-        for (const c of uniq) {
-            try {
-                var testUrl = c + "?type=stb&prehash=0&action=handshake";
-                var resp;
-                if (isLocal) {
-                    resp = await fetch(testUrl, { method: 'GET', signal: AbortSignal.timeout(5000) });
-                } else {
-                    resp = await fetch('/api/stalker/proxy?url=' + encodeURIComponent(testUrl) + '&mac=' + encodeURIComponent(this.mac), { signal: AbortSignal.timeout(8000) });
-                }
-                if (!resp.ok) continue;
-                var text = await resp.text();
-                var data = JSON.parse(text);
-                var token = (data.js && data.js.token) || data.token;
-                if (token) { console.log('[Stalker] Base resolved:', c); return c; }
-            } catch(e) {}
-        }
-
-        return normalized + "/server/load.php";
+        // Return first candidate (backend will auto-detect)
+        return unique[0];
     }
 
     async _request(action, extraParams = {}) {
@@ -141,10 +124,6 @@ class StalkerClient {
 
     async authenticate(username, password) {
         try {
-            // Step 0: Resolve portal API base URL (try multiple paths)
-            this.portalUrl = await this._resolveBase(this.portalUrl);
-            console.log("[Stalker] Portal URL:", this.portalUrl);
-
             // Step 1: Handshake to get token
             console.log("[Stalker] Starting handshake...");
             const handshake = await this._request('handshake', {
@@ -177,48 +156,14 @@ class StalkerClient {
     }
 
     async getChannels(genreId = null) {
-        const all = [];
-        let page = 1;
-        let hasMore = true;
-
-        while (hasMore) {
-            const params = {
-                type: 'itv',
-                force_ch_link_check: 0,
-                sortby: 'number',
-                p: page,
-            };
-            if (genreId && genreId !== 'all') {
-                params.genre = genreId;
-            }
-
-            const data = await this._request('get_ordered_list', params);
-            console.log('[Stalker] get_ordered_list page', page, ':', data);
-
-            if (data && data.js) {
-                const list = Array.isArray(data.js) ? data.js : (data.js.data || []);
-                list.forEach(function(ch) { all.push(ch); });
-
-                const total = Number(data.total_items) || 0;
-                const max = Number(data.max_page_items) || list.length;
-                const totalPages = max > 0 ? Math.ceil(total / max) : 1;
-                hasMore = page < totalPages && list.length > 0;
-                page++;
-                if (page > 20) hasMore = false;
-            } else {
-                hasMore = false;
-            }
+        const params = {
+            type: 'itv',
+            force_ch_link_check: 0,
+            sortby: 'number',
+        };
+        if (genreId && genreId !== 'all') {
+            params.genre = genreId;
         }
-
-        return all.map(function(ch) { return {
-            id: ch.id,
-            number: ch.number,
-            name: ch.name,
-            url: ch.cmd,
-            logo: ch.logo || ch.logo_src || ch.tv_logo || null,
-            genre_id: ch.tv_genre_id
-        };});
-    }
 
         const data = await this._request('get_ordered_list', params);
 
@@ -271,49 +216,15 @@ class StalkerClient {
     }
 
     async getVodList(categoryId, type) {
-        const all = [];
-        let page = 1;
-        let hasMore = true;
+        const params = {
+            'type': type || 'vod',
+            'action': 'get_ordered_list',
+            'p': 1 // simple pagination, page 1
+        };
 
-        while (hasMore) {
-            const params = {
-                'type': type || 'vod',
-                'p': page,
-            };
-
-            if (categoryId && categoryId !== 'all') {
-                params.category = categoryId;
-            }
-
-            const data = await this._request('get_ordered_list', params);
-            console.log('[Stalker] get_ordered_list ' + type + ' page', page, ':', data);
-
-            if (data && data.js) {
-                const list = Array.isArray(data.js) ? data.js : (data.js.data || []);
-                list.forEach(function(m) { all.push(m); });
-
-                const total = Number(data.total_items) || 0;
-                const max = Number(data.max_page_items) || list.length;
-                const totalPages = max > 0 ? Math.ceil(total / max) : 1;
-                hasMore = page < totalPages && list.length > 0;
-                page++;
-                if (page > 20) hasMore = false;
-            } else {
-                hasMore = false;
-            }
+        if (categoryId && categoryId !== 'all') {
+            params.category = categoryId;
         }
-
-        return all.map(m => ({
-            id: m.id,
-            name: m.name,
-            url: m.cmd,
-            logo: m.screenshot_uri || m.logo,
-            description: m.description,
-            year: m.year,
-            genres: m.genres_str,
-            rating: m.rating_imdb || m.rating_kinopoisk
-        }));
-    }
 
         const data = await this._request('get_ordered_list', params);
 
