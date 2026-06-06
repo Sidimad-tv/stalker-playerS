@@ -1,21 +1,20 @@
 FROM node:18-slim
 
+# Install FFMPEG directly into the container so your transcoding features work!
+RUN apt-get update && apt-get install -y ffmpeg && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
-# Copy dependency definitions
+# Copy and install node dependencies
 COPY package*.json ./
-
-# Install dependencies
 RUN npm install --production
 
-# Copy all project files
+# Copy remaining application code
 COPY . .
 
-# Expose port 7860 (Hugging Face requires this exact port)
+# Expose Hugging Face's required port
 EXPOSE 7860
-
-# Set environment variable so your server listens on the correct port
 ENV PORT=7860
 
-# Start your Node.js application
-CMD [ "node", "api/server.js" ]
+# Start the wrapper script instead of the serverless function
+CMD [ "node", "index.js" ]
