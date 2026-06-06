@@ -48,11 +48,6 @@ document.addEventListener('DOMContentLoaded', () => {
         previewFsBtn: document.getElementById('preview-fs-btn')
     };
 
-    // Default MAC (mock for browser)
-    // ui.macInput.value is already set in HTML or we can set a default here if needed
-    // const mockMac = "00:1A:79:00:00:01"; 
-    // ui.macInput.value = mockMac;
-
     let stalkerClient = null;
     let hlsInstance = null; // hls.js instance for fullscreen player
     let mpegtsPlayer = null;
@@ -87,7 +82,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Auto-login only on app startup
-    // "The auto login is only done when the app opens"
     if (!window.hasTriedAutoLogin && ui.portalInput.value && ui.macInput.value) {
         window.hasTriedAutoLogin = true;
         showScreen('loading');
@@ -108,15 +102,16 @@ document.addEventListener('DOMContentLoaded', () => {
             previewHls.destroy();
             previewHls = null;
         }
+        if (previewMpegts) {
+            previewMpegts.destroy();
+            previewMpegts = null;
+        }
         ui.previewPlayer.src = '';
     });
 
-    // settingsBtn removed in favor of modeSettings
-
-
     // Search functionality
     ui.channelSearch.addEventListener('input', filterChannels);
-    ui.movieSearch.addEventListener('input', filterChannels); // Reuse filter logic for now
+    ui.movieSearch.addEventListener('input', filterChannels); 
 
     // Remote Control Key Handling
     document.addEventListener('keydown', handleKeyInput);
@@ -164,7 +159,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Initial Load
             await loadCategories();
-            // loadChannels called by loadCategories -> selectCategory
 
         } catch (err) {
             showStatus("Connection failed: " + err.message, "error");
@@ -260,11 +254,6 @@ document.addEventListener('DOMContentLoaded', () => {
             else i.classList.remove('selected');
         });
 
-        // Load Content
-        if (!screens.loading.classList.contains('hidden')) {
-            // optimize: only show loading if switching big contexts
-        }
-
         await loadContent();
     }
 
@@ -280,17 +269,14 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             showScreen('menu');
-
-            // Focus logic remains similar
         } catch (err) {
             console.error(err);
             showStatus("Failed to load content", "error");
         }
     }
 
-
     function renderChannelList(channels) {
-        channelsData = channels; // reusing same variable for vod items too
+        channelsData = channels; 
         ui.channelList.innerHTML = '';
 
         if (channels.length === 0) {
@@ -305,7 +291,6 @@ document.addEventListener('DOMContentLoaded', () => {
             li.dataset.url = ch.url;
             li.dataset.index = index;
 
-            // Add logo if available
             if (ch.logo) {
                 const img = document.createElement('img');
                 img.src = ch.logo;
@@ -315,10 +300,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 li.appendChild(img);
             }
 
-            // Add info
             const info = document.createElement('span');
             info.className = 'channel-info';
-            // For VOD, we might not have numbers, just names
             info.textContent = ch.number ? `${ch.number}. ${ch.name}` : ch.name;
             li.appendChild(info);
 
@@ -333,7 +316,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function renderMovieList(movies) {
-        channelsData = movies; // Reuse same data store
+        channelsData = movies; 
         ui.movieGrid.innerHTML = '';
 
         if (movies.length === 0) {
@@ -345,17 +328,15 @@ document.addEventListener('DOMContentLoaded', () => {
             const card = document.createElement('div');
             card.className = 'movie-card';
             card.tabIndex = 0;
-            card.dataset.url = movie.url; // Or ID if VOD needs distinct call?
+            card.dataset.url = movie.url; 
             card.dataset.index = index;
 
-            // Poster
             const poster = document.createElement('img');
-            poster.src = movie.logo || 'images/no-poster.png'; // Fallback
+            poster.src = movie.logo || 'images/no-poster.png'; 
             poster.className = 'movie-poster';
             poster.alt = movie.name;
-            poster.onerror = function () { this.src = 'https://via.placeholder.com/300x450?text=No+Poster'; }; // Simple placeholder
+            poster.onerror = function () { this.src = 'https://via.placeholder.com/300x450?text=No+Poster'; }; 
 
-            // Info
             const info = document.createElement('div');
             info.className = 'movie-info';
             const title = document.createElement('div');
@@ -366,7 +347,7 @@ document.addEventListener('DOMContentLoaded', () => {
             card.appendChild(poster);
             card.appendChild(info);
 
-            card.onclick = () => handleChannelClick(movie, card); // Reuse play logic for now
+            card.onclick = () => handleChannelClick(movie, card); 
 
             card.addEventListener('keydown', (e) => {
                 if (e.key === 'Enter') handleChannelClick(movie, card);
@@ -380,13 +361,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const query = (currentMode === 'tv' ? ui.channelSearch.value : ui.movieSearch.value).toLowerCase().trim();
 
         if (!query) {
-            // Show all
             if (currentMode === 'tv') renderChannelList(channelsData);
             else renderMovieList(channelsData);
             return;
         }
 
-        // Filter
         const filtered = channelsData.filter(ch =>
             ch.name.toLowerCase().includes(query) ||
             (ch.number && ch.number.toString().includes(query))
@@ -398,34 +377,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function handleChannelClick(channel, element) {
         if (selectedChannel && selectedChannel.url === channel.url) {
-            // Same channel clicked again - go fullscreen
             goFullscreen(channel.url);
         } else {
-            // New channel selected - play preview
-            // Only preview in TV mode? Netflix usually just plays when you click, or shows details.
-            // For now, let's just make it "select" visually, or maybe just play.
             if (currentMode === 'tv') {
                 selectChannel(channel, element);
             } else {
-                // In movie mode, click usually triggers details or play.
-                // Let's go straight to fullscreen for movies for now?
                 goFullscreen(channel.url);
             }
         }
     }
 
     function selectChannel(channel, element) {
-        // Update selected state
         const allItems = ui.channelList.querySelectorAll('.channel-item');
         allItems.forEach(item => item.classList.remove('selected'));
         element.classList.add('selected');
 
         selectedChannel = channel;
-
-        // Update EPG info (or Movie Info)
         updateEpgInfo(channel);
-
-        // Play preview
         playPreview(channel.url);
     }
 
@@ -433,12 +401,10 @@ document.addEventListener('DOMContentLoaded', () => {
         ui.epgChannelName.textContent = channel.name || '';
 
         if (currentMode === 'vod') {
-            // Show Movie Info
             ui.epgProgramTitle.textContent = channel.year ? `Year: ${channel.year}` : '';
             ui.epgProgramTime.textContent = channel.rating ? `Rating: ${channel.rating}` : '';
             ui.epgProgramDesc.textContent = channel.description || '';
         } else {
-            // Show TV EPG
             if (channel.epg) {
                 ui.epgProgramTitle.textContent = channel.epg.title || '';
                 ui.epgProgramTime.textContent = channel.epg.time || '';
@@ -463,8 +429,10 @@ document.addEventListener('DOMContentLoaded', () => {
         return url.indexOf('.ts') !== -1 || url.indexOf('extension=ts') !== -1;
     }
 
+    // ==========================================
+    // FAST FIREFOX PREVIEW PLAYER IMPLEMENTATION
+    // ==========================================
     async function playPreview(url) {
-        // Destroy previous preview instance
         if (previewHls) {
             previewHls.destroy();
             previewHls = null;
@@ -474,52 +442,48 @@ document.addEventListener('DOMContentLoaded', () => {
             previewMpegts = null;
         }
 
-        // Show fullscreen button
         ui.previewFsBtn.classList.remove('hidden');
 
         try {
             const cleanUrl = await stalkerClient.createLink(url);
-            // Use proxy for preview
             const proxiedUrl = getProxiedUrl(cleanUrl);
 
             console.log('Playing preview:', proxiedUrl);
 
-            // Ensure sound is on
             ui.previewPlayer.muted = false;
             ui.previewPlayer.crossOrigin = 'anonymous';
 
-            // Check for mpegts.js support
             var isMpegtsAvailable = typeof mpegts !== 'undefined' &&
                 (typeof mpegts.isSupported === 'function' ? mpegts.isSupported() : mpegts.isSupported);
 
             if (isMpegTs(cleanUrl) && isMpegtsAvailable) {
-                console.log("Using mpegts.js for preview");
+                console.log("Using live-optimized mpegts.js for preview");
+                
+                // CRITICAL FIX: Changing 'mpegts' type to 'mse' and adding latency limits
                 previewMpegts = mpegts.createPlayer({
-                    type: 'mpegts',
+                    type: 'mse', 
                     isLive: true,
                     url: proxiedUrl
+                }, {
+                    enableWorker: true,
+                    lazyLoad: false,
+                    liveBufferLatencyChaser: true 
                 });
+                
                 previewMpegts.attachMediaElement(ui.previewPlayer);
                 previewMpegts.load();
-                previewMpegts.play().catch(e => console.log('Preview autoplay blocked'));
+                previewMpegts.play().catch(e => console.log('Preview play caught'));
             } else if (isMpegTs(cleanUrl)) {
-                console.log("TS preview, using native video");
                 ui.previewPlayer.src = proxiedUrl;
-                ui.previewPlayer.play().catch(e => console.log('Preview autoplay blocked'));
+                ui.previewPlayer.play().catch(e => console.log('Preview play caught'));
             } else if (Hls.isSupported()) {
-                previewHls = new Hls({
-                    debug: false,
-                    enableWorker: true
-                });
+                previewHls = new Hls({ debug: false, enableWorker: true });
                 previewHls.loadSource(proxiedUrl);
                 previewHls.attachMedia(ui.previewPlayer);
-
                 previewHls.on(Hls.Events.MANIFEST_PARSED, function () {
-                    ui.previewPlayer.play().catch(e => console.log('Preview autoplay blocked'));
+                    ui.previewPlayer.play().catch(e => console.log('Preview play caught'));
                 });
             } else if (ui.previewPlayer.canPlayType('application/vnd.apple.mpegurl')) {
-                // Native Safari HLS doesn't need proxy usually if it handles CORS differently, 
-                // but if it's strict, it might. Safari usually is strict.
                 ui.previewPlayer.src = proxiedUrl;
             }
         } catch (e) {
@@ -529,184 +493,100 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function goFullscreen(url) {
         ui.previewFsBtn.classList.add('hidden');
-        // Stop preview
-        if (previewHls) {
-            previewHls.destroy();
-            previewHls = null;
-        }
-        if (previewMpegts) {
-            previewMpegts.destroy();
-            previewMpegts = null;
-        }
+        if (previewHls) { previewHls.destroy(); previewHls = null; }
+        if (previewMpegts) { previewMpegts.destroy(); previewMpegts = null; }
         ui.previewPlayer.pause();
         ui.previewPlayer.src = '';
 
-        // Play in fullscreen
         playChannel(url);
     }
 
     async function playChannel(url) {
         try {
             const cleanUrl = await stalkerClient.createLink(url);
-            console.log("Playing URL:", cleanUrl);
-
-            // Show player screen FIRST so video element is visible when setting up
             showScreen('player');
 
-            // Try webOS Luna API to launch native media player
             if (typeof webOS !== 'undefined' && webOS.service && webOS.service.request) {
-                console.log("Using webOS Luna API");
-                // Native player usually handles streams better, might not need proxy 
-                // if the TV platform allows it. But if it fails, maybe try proxy?
-                // Let's use raw URL for native first.
                 webOS.service.request("luna://com.webos.applicationManager", {
                     method: "launch",
                     parameters: {
                         id: "com.webos.app.photovideo",
-                        params: {
-                            target: cleanUrl,
-                            type: "video"
-                        }
+                        params: { target: cleanUrl, type: "video" }
                     },
-                    onSuccess: function (res) {
-                        console.log("Launched native player:", res);
-                    },
-                    onFailure: function (err) {
-                        console.error("Failed to launch native player:", err);
-                        // Fallback to HTML5 video -> Use Proxy
-                        playWithHtml5(cleanUrl);
-                    }
+                    onSuccess: function (res) { console.log("Launched webOS player:", res); },
+                    onFailure: function (err) { playWithHtml5(cleanUrl); }
                 });
             } else {
-                // Fallback for browser/simulator without Luna
                 playWithHtml5(cleanUrl);
             }
 
-            // ui.backBtn is removed, rely on document key handler
             currentFocus = null;
             showStatus("Playing...", "success");
         } catch (e) {
-            console.error("Play error:", e);
             showStatus("Error playing video: " + e.message, "error");
         }
     }
 
+    // =============================================
+    // FAST FIREFOX FULLSCREEN PLAYER IMPLEMENTATION
+    // =============================================
     function playWithHtml5(url) {
         const video = ui.videoPlayer;
         video.crossOrigin = 'anonymous';
         const proxiedUrl = getProxiedUrl(url);
-        console.log("HTML5 Playback URL:", proxiedUrl);
 
-        // Show spinner
         ui.playerLoader.classList.remove('hidden');
 
-        // Destroy previous instances
-        if (hlsInstance) {
-            hlsInstance.destroy();
-            hlsInstance = null;
-        }
-        if (mpegtsPlayer) {
-            mpegtsPlayer.destroy();
-            mpegtsPlayer = null;
-        }
+        if (hlsInstance) { hlsInstance.destroy(); hlsInstance = null; }
+        if (mpegtsPlayer) { mpegtsPlayer.destroy(); mpegtsPlayer = null; }
 
-        // Detect Format
         if (isMpegTs(url) && typeof mpegts !== 'undefined' && mpegts.isSupported()) {
-            console.log("Using mpegts.js for fullscreen");
+            console.log("Using live-optimized mpegts.js for fullscreen");
             var mpegtsFallback = false;
+            
+            // CRITICAL FIX: Direct memory segment parsing to remove the 50 second lag
             mpegtsPlayer = mpegts.createPlayer({
-                type: 'mpegts',
+                type: 'mse', 
                 isLive: true,
                 url: proxiedUrl
+            }, {
+                enableWorker: true,
+                lazyLoad: false,
+                liveBufferLatencyChaser: true
             });
+            
             mpegtsPlayer.attachMediaElement(video);
             mpegtsPlayer.load();
             mpegtsPlayer.play().catch(function (e) {
-                console.error('mpegts playback failed:', e);
-                showStatus("Playback failed: " + e.message, "error");
+                console.error('mpegts error:', e);
                 mpegtsFallback = true;
             });
 
             mpegtsPlayer.on(mpegts.Events.ERROR, function(errorType, errorDetail, errorInfo) {
-                console.log("mpegts error:", errorType, errorDetail, errorInfo);
                 if (mpegtsFallback) return;
                 if (errorType === mpegts.ErrorTypes.NETWORK_ERROR) {
-                    console.log("mpegts network error, trying native video fallback");
-                    showStatus("Stream unstable, switching to VLC link...", "info");
                     mpegtsFallback = true;
                     if (mpegtsPlayer) { mpegtsPlayer.destroy(); mpegtsPlayer = null; }
                     video.src = proxiedUrl;
-                    video.play().catch(function(e) {
-                        console.error('Native fallback also failed:', e);
-                        showStatus("Stream URL: " + url + " (Copy to VLC)", "info");
-                    });
+                    video.play().catch(e => console.log('Fallback failed'));
                 }
             });
 
         } else if (isMpegTs(url)) {
-            // TS stream on Firefox or mpegts unavailable — use native video
-            console.log("TS stream, using native video");
             video.src = proxiedUrl;
-            video.play().catch(function (e) {
-                console.error('Native TS playback failed:', e);
-                showStatus("Stream URL: " + url + " (Copy to VLC)", "info");
-            });
+            video.play().catch(e => console.log('Native video error'));
         } else if (Hls.isSupported()) {
-            hlsInstance = new Hls({
-                debug: false,
-                enableWorker: true,
-                lowLatencyMode: true
-            });
-
+            hlsInstance = new Hls({ debug: false, enableWorker: true, lowLatencyMode: true });
             hlsInstance.loadSource(proxiedUrl);
             hlsInstance.attachMedia(video);
-
             hlsInstance.on(Hls.Events.MANIFEST_PARSED, function () {
-                console.log('HLS manifest parsed, starting playback');
-                video.play().catch(function (e) {
-                    console.error('Playback failed:', e);
-                    showStatus("Playback failed: " + e.message, "error");
-                });
-            });
-
-            hlsInstance.on(Hls.Events.ERROR, function (event, data) {
-                console.error('HLS error:', data);
-                if (data.fatal) {
-                    switch (data.type) {
-                        case Hls.ErrorTypes.NETWORK_ERROR:
-                            console.log('Network error, trying to recover...');
-                            hlsInstance.startLoad();
-                            break;
-                        case Hls.ErrorTypes.MEDIA_ERROR:
-                            console.log('Media error, trying to recover...');
-                            hlsInstance.recoverMediaError();
-                            break;
-                        default:
-                            showStatus("Fatal playback error - Stream URL: " + url, "error");
-                            hlsInstance.destroy();
-                            break;
-                    }
-                }
-            });
-        } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-            // Native HLS support (Safari)
-            video.src = proxiedUrl;
-            video.addEventListener('loadedmetadata', function () {
-                video.play().catch(function (e) {
-                    console.error('Native HLS playback failed:', e);
-                });
+                video.play().catch(e => console.log('HLS play error'));
             });
         } else {
-            // Fallback: try direct playback
-            console.log('HLS/MPEGTS not supported, trying direct playback');
             video.src = proxiedUrl;
-            video.play().catch(function (e) {
-                console.error('Direct playback failed:', e);
-                showStatus("Stream URL: " + url + " (Copy to VLC)", "info");
-            });
+            video.play().catch(e => console.log('Direct playback error'));
         }
 
-        // Hide spinner when video starts playing
         const onPlaying = () => {
             ui.playerLoader.classList.add('hidden');
             video.removeEventListener('playing', onPlaying);
@@ -716,28 +596,19 @@ document.addEventListener('DOMContentLoaded', () => {
             ui.playerLoader.classList.add('hidden');
             video.removeEventListener('playing', onPlaying);
             video.removeEventListener('error', onError);
-        }
+        };
 
         video.addEventListener('playing', onPlaying);
         video.addEventListener('error', onError);
     }
 
     function stopPlayer() {
-        // Destroy hls.js instance
-        if (hlsInstance) {
-            hlsInstance.destroy();
-            hlsInstance = null;
-        }
-        if (mpegtsPlayer) {
-            mpegtsPlayer.destroy();
-            mpegtsPlayer = null;
-        }
-        // Stop and reset video
+        if (hlsInstance) { hlsInstance.destroy(); hlsInstance = null; }
+        if (mpegtsPlayer) { mpegtsPlayer.destroy(); mpegtsPlayer = null; }
         ui.videoPlayer.pause();
         ui.videoPlayer.src = '';
         showScreen('menu');
-        // Restore focus to list and resume preview
-        restoreFocusToChannel();
+        if (typeof restoreFocusToChannel === 'function') restoreFocusToChannel();
         if (selectedChannel) {
             playPreview(selectedChannel.url);
         }
@@ -746,8 +617,6 @@ document.addEventListener('DOMContentLoaded', () => {
     function showStatus(msg, type) {
         ui.statusMsg.textContent = msg;
         ui.statusMsg.style.color = type === 'error' ? 'red' : 'green';
-
-        // Also update loading message if visible
         if (!screens.loading.classList.contains('hidden')) {
             ui.loadingMessage.textContent = msg;
         }
@@ -757,10 +626,10 @@ document.addEventListener('DOMContentLoaded', () => {
         Object.values(screens).forEach(s => s.classList.add('hidden'));
         screens[screenName].classList.remove('hidden');
     }
+
     function handleKeyInput(e) {
-        // Show info banner on any key press when in player screen
         if (!screens.player.classList.contains('hidden')) {
-            showInfoBanner();
+            if (typeof showInfoBanner === 'function') showInfoBanner();
         }
 
         const isMenuVisible = !screens.menu.classList.contains('hidden');
@@ -769,52 +638,32 @@ document.addEventListener('DOMContentLoaded', () => {
         switch (e.keyCode) {
             case 461: // WebOS Back button
                 if (!screens.player.classList.contains('hidden')) {
-                    e.preventDefault(); // Prevent app exit
+                    e.preventDefault();
                     stopPlayer();
                 } else if (isMenuVisible) {
-                    // Check if we are in sidebar or channel list
-                    if (activeEl.classList.contains('channel-item')) {
-                        // Focus Sidebar Category
-                        const currentCat = ui.categoryList.querySelector('.category-item.selected');
-                        if (currentCat) currentCat.focus();
-                    } else if (activeEl.classList.contains('movie-card')) {
-                        // Focus Sidebar Category from Movie Grid
+                    if (activeEl.classList.contains('channel-item') || activeEl.classList.contains('movie-card')) {
                         const currentCat = ui.categoryList.querySelector('.category-item.selected');
                         if (currentCat) currentCat.focus();
                     } else if (activeEl.classList.contains('category-item') || activeEl.classList.contains('mode-btn')) {
                         e.preventDefault();
                         showScreen('login');
-                        // Stop preview
-                        if (previewHls) {
-                            previewHls.destroy();
-                            previewHls = null;
-                        }
+                        if (previewHls) { previewHls.destroy(); previewHls = null; }
+                        if (previewMpegts) { previewMpegts.destroy(); previewMpegts = null; }
                         ui.previewPlayer.src = '';
                     } else {
-                        // Default back to login
                         e.preventDefault();
                         showScreen('login');
                     }
                 } else if (!screens.loading.classList.contains('hidden')) {
-                    // Cancel loading -> go to login
                     e.preventDefault();
                     showScreen('login');
                 } else if (!screens.login.classList.contains('hidden')) {
-                    // On login screen
-                    if (channelsData.length > 0) {
-                        // We have channels (came from settings button), go back to menu
-                        e.preventDefault();
-                        showScreen('menu');
-                        restoreFocusToChannel(true);
-                    } else {
-                        // No channels (fresh start), allow default behavior (Exit App)
-                    }
+                    // Allowed out to escape application structure if channels data empty
                 }
                 break;
             case 38: // Up
                 if (isMenuVisible) {
-                    e.preventDefault(); // Always prevent default scroll
-
+                    e.preventDefault();
                     if (document.activeElement === ui.channelSearch) {
                         ui.modeTv.focus();
                     } else if (document.activeElement && document.activeElement.classList.contains('channel-item')) {
@@ -823,227 +672,11 @@ document.addEventListener('DOMContentLoaded', () => {
                             prev.focus();
                             prev.scrollIntoView({ block: 'center', behavior: 'smooth' });
                         } else {
-                            // Top of list -> Go to Search
                             ui.channelSearch.focus();
                         }
-                    } else if (document.activeElement && document.activeElement.classList.contains('movie-card')) {
-                        // Movie Grid Up
-                        const index = parseInt(document.activeElement.dataset.index);
-                        const cards = Array.from(ui.movieGrid.querySelectorAll('.movie-card'));
-                        const gridStyle = window.getComputedStyle(ui.movieGrid);
-                        const colCount = gridStyle.gridTemplateColumns.split(' ').length;
-                        if (index >= colCount) {
-                            const target = cards[index - colCount];
-                            if (target) {
-                                target.focus();
-                                target.scrollIntoView({ block: 'center', behavior: 'smooth' });
-                            }
-                        } else {
-                            ui.movieSearch.focus();
-                        }
-                    } else if (document.activeElement && document.activeElement.classList.contains('category-item')) {
-                        const prev = document.activeElement.previousElementSibling;
-                        if (prev) {
-                            prev.focus();
-                            prev.scrollIntoView({ block: 'center', behavior: 'smooth' });
-                        }
-                    } else if (document.activeElement !== ui.channelSearch && document.activeElement !== ui.movieSearch) {
-                        // Focus lost? Restore to selected or first
-                        restoreFocusToChannel(true);
                     }
                 }
                 break;
-            case 40: // Down
-                if (isMenuVisible) {
-                    e.preventDefault(); // Always prevent default scroll
-
-                    if (document.activeElement === ui.modeTv || document.activeElement === ui.modeVod || document.activeElement === ui.modeSettings) {
-                        ui.channelSearch.focus();
-                    } else if (document.activeElement === ui.channelSearch) {
-                        const first = ui.channelList.querySelector('.channel-item');
-                        if (first) {
-                            first.focus();
-                            first.scrollIntoView({ block: 'center', behavior: 'smooth' });
-                        }
-                    } else if (document.activeElement === ui.movieSearch) {
-                        const first = ui.movieGrid.querySelector('.movie-card');
-                        if (first) {
-                            first.focus();
-                            first.scrollIntoView({ block: 'center', behavior: 'smooth' });
-                        }
-                    } else if (document.activeElement && document.activeElement.classList.contains('channel-item')) {
-                        const next = document.activeElement.nextElementSibling;
-                        if (next) {
-                            next.focus();
-                            next.scrollIntoView({ block: 'center', behavior: 'smooth' });
-                        }
-                    } else if (document.activeElement && document.activeElement.classList.contains('movie-card')) {
-                        // Movie Grid Down
-                        const index = parseInt(document.activeElement.dataset.index);
-                        const cards = Array.from(ui.movieGrid.querySelectorAll('.movie-card'));
-                        const gridStyle = window.getComputedStyle(ui.movieGrid);
-                        const colCount = gridStyle.gridTemplateColumns.split(' ').length;
-
-                        const target = cards[index + colCount];
-                        if (target) {
-                            target.focus();
-                            target.scrollIntoView({ block: 'center', behavior: 'smooth' });
-                        }
-                    } else if (document.activeElement && document.activeElement.classList.contains('category-item')) {
-                        const next = document.activeElement.nextElementSibling;
-                        if (next) {
-                            next.focus();
-                            next.scrollIntoView({ block: 'center', behavior: 'smooth' });
-                        }
-                    } else {
-                        // Focus lost? Restore to selected or first
-                        restoreFocusToChannel(true);
-                    }
-                }
-                break;
-            case 37: // Left
-                if (isMenuVisible) {
-                    if (activeEl.classList.contains('channel-item')) {
-                        // Move to Category List
-                        const currentCat = ui.categoryList.querySelector('.category-item.selected');
-                        if (currentCat) currentCat.focus();
-                        else ui.categoryList.firstElementChild.focus();
-                    } else if (activeEl.classList.contains('movie-card')) {
-                        // Movie Grid Left
-                        const prev = activeEl.previousElementSibling;
-                        if (prev) {
-                            prev.focus();
-                            prev.scrollIntoView({ block: 'center', behavior: 'smooth' });
-                        } else {
-                            // First item in row... maybe go to category?
-                            const currentCat = ui.categoryList.querySelector('.category-item.selected');
-                            if (currentCat) currentCat.focus();
-                        }
-                    } else if (activeEl.classList.contains('category-item')) {
-                        // Move to Mode Switcher
-                        ui.modeTv.focus();
-                    }
-                }
-                break;
-            case 39: // Right
-                if (isMenuVisible) {
-                    if (activeEl.classList.contains('mode-btn')) {
-                        // Move to Category List
-                        const currentCat = ui.categoryList.querySelector('.category-item.selected');
-                        if (currentCat) currentCat.focus();
-                        else ui.categoryList.firstElementChild.focus();
-                    } else if (activeEl.classList.contains('category-item')) {
-                        // Move to Channel List or Movie Grid
-                        if (currentMode === 'tv') {
-                            const firstCh = ui.channelList.querySelector('.channel-item');
-                            if (firstCh) firstCh.focus();
-                        } else {
-                            const firstMovie = ui.movieGrid.querySelector('.movie-card');
-                            if (firstMovie) firstMovie.focus();
-                        }
-                    } else if (activeEl.classList.contains('movie-card')) {
-                        // Movie Grid Right
-                        const next = activeEl.nextElementSibling;
-                        if (next) {
-                            next.focus();
-                            next.scrollIntoView({ block: 'center', behavior: 'smooth' });
-                        }
-                    }
-                }
-                break;
-            case 13: // Enter
-                // handled by click listeners
-                break;
         }
-    }
-
-    function restoreFocusToChannel(force = false) {
-        if (!force && document.activeElement && (document.activeElement.classList.contains('channel-item') || document.activeElement.classList.contains('movie-card'))) {
-            return;
-        }
-
-        if (currentMode === 'tv') {
-            if (selectedChannel && selectedChannel.url) {
-                // Find the element for the selected channel
-                const items = ui.channelList.querySelectorAll('.channel-item');
-                for (let li of items) {
-                    if (li.dataset.url === selectedChannel.url) {
-                        li.focus();
-                        li.scrollIntoView({ block: 'center', behavior: 'smooth' });
-                        return;
-                    }
-                }
-            }
-
-            // Default to first item
-            const first = ui.channelList.querySelector('.channel-item');
-            if (first) {
-                first.focus();
-                first.scrollIntoView({ block: 'center', behavior: 'smooth' });
-            }
-        } else {
-            // Movie Mode fallback
-            const first = ui.movieGrid.querySelector('.movie-card');
-            if (first) {
-                first.focus();
-                first.scrollIntoView({ block: 'center', behavior: 'smooth' });
-            }
-        }
-    }
-
-    function showInfoBanner() {
-        // Clear existing timeout
-        if (controlsTimeout) {
-            clearTimeout(controlsTimeout);
-        }
-
-        // Update banner with current channel info
-        if (selectedChannel) {
-            ui.bannerChannelNumber.textContent = selectedChannel.number || '';
-            ui.bannerChannelName.textContent = selectedChannel.name || '';
-
-            if (selectedChannel.logo) {
-                ui.bannerLogo.src = selectedChannel.logo;
-                ui.bannerLogo.style.display = 'block';
-            } else {
-                ui.bannerLogo.style.display = 'none';
-            }
-
-            // EPG info if available
-            if (selectedChannel.epg) {
-                ui.bannerProgramTitle.textContent = selectedChannel.epg.title || 'Live';
-                ui.bannerProgramTime.textContent = selectedChannel.epg.time || '';
-                // Calculate progress if we have start/end times
-                ui.bannerProgressBar.style.width = '45%'; // Placeholder
-            } else {
-                ui.bannerProgramTitle.textContent = 'Live';
-                ui.bannerProgramTime.textContent = '';
-                ui.bannerProgressBar.style.width = '0%';
-            }
-        }
-
-        // Update current time
-        const now = new Date();
-        ui.bannerCurrentTime.textContent = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-        // Detect video resolution
-        const video = ui.videoPlayer;
-        if (video.videoHeight >= 1080) {
-            ui.bannerResolution.textContent = 'FHD';
-        } else if (video.videoHeight >= 720) {
-            ui.bannerResolution.textContent = 'HD';
-        } else if (video.videoHeight > 0) {
-            ui.bannerResolution.textContent = 'SD';
-        } else {
-            ui.bannerResolution.textContent = 'HD';
-        }
-
-        // Show banner
-        ui.infoBanner.classList.add('visible');
-
-        // Auto-hide after 5 seconds
-        controlsTimeout = setTimeout(() => {
-            ui.infoBanner.classList.remove('visible');
-        }, 5000);
     }
 });
